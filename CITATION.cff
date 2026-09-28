@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use DeskMind Brain, please cite it as below."
+title: "DeskMind Brain: typed, calibrated step decisions for computer-use agents"
+type: software
+authors:
+  - name: "The DeskMind authors"
+repository-code: "https://github.com/deskmind-ai/brain"
+url: "https://huggingface.co/deskmind"
+license: Apache-2.0
+version: 0.2.0
+date-released: "2026-09-28"
+keywords:
+  - computer-use
+  - agents
+  - calibration
+  - mlx

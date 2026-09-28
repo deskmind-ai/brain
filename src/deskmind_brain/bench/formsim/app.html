@@ -1,0 +1,174 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Loading…</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 0; color: #222; }
+  header { display: flex; gap: 16px; align-items: center; padding: 10px 20px; background: #f4f4f6; }
+  header strong { font-size: 18px; margin-right: 20px; }
+  main { display: flex; gap: 24px; padding: 16px 20px; }
+  form.search { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; padding: 12px 20px; border-bottom: 1px solid #ddd; }
+  .field { display: flex; flex-direction: column; gap: 4px; position: relative; }
+  [role=listbox] { position: absolute; top: 100%; left: 0; background: #fff; border: 1px solid #aaa; list-style: none; margin: 0; padding: 0; z-index: 5; min-width: 220px; }
+  [role=option] { padding: 4px 8px; cursor: pointer; }
+  .calendar { position: absolute; top: 100%; left: 0; background: #fff; border: 1px solid #aaa; padding: 8px; z-index: 6; display: grid; grid-template-columns: repeat(7, 40px); gap: 2px; }
+  .calendar .caption, .calendar .done { grid-column: span 7; }
+  aside { min-width: 230px; }
+  aside fieldset { margin-bottom: 10px; }
+  .chip[aria-pressed=true] { background: #135; color: #fff; }
+  .results li { margin-bottom: 10px; list-style: none; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+  footer { padding: 20px; color: #777; font-size: 12px; }
+  .loading { color: #a60; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+// Data-driven multi-constraint search app. The task spec (fields, filters, items) comes from ./tasks/<id>.json;
+// everything the evaluator needs is recorded in window.__state.
+(async () => {
+  const id = new URLSearchParams(location.search).get("t");
+  const spec = await (await fetch(`tasks/${id}.json`)).json();
+  const L = spec.labels;
+  document.title = `${spec.site} — ${L.title}`;
+  const S = window.__state = { submitted: null, form: {}, filters: {}, sort: spec.sort ? spec.sort.options[0] : null, opened: null, openedWith: null, reserved: false, pending: {}, layout: spec.layout || "classic" };
+  for (const f of spec.filters) S.filters[f.key] = f.kind === "checkbox" || f.kind === "switch" || f.kind === "chip" ? !!f.default : (f.default ?? null);
+  const root = document.getElementById("root");
+  const h = (tag, attrs = {}, ...kids) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+      else if (v !== null && v !== undefined && v !== false) e.setAttribute(k, v === true ? "" : v);
+    }
+    for (const k of kids.flat()) if (k !== null && k !== undefined) e.append(k.nodeType ? k : document.createTextNode(k));
+    return e;
+  };
+
+  function header() {
+    return h("header", {}, h("strong", {}, spec.site), ...spec.nav.map(n => h("a", { href: "#" + n.toLowerCase() }, n)),
+      h("a", { href: "#signin", style: "margin-left:auto" }, L.signin));
+  }
+
+  // ---- search form ---------------------------------------------------------------------------------------
+  function comboField(f) {
+    const input = h("input", { type: "text", role: "combobox", "aria-label": f.label, "aria-expanded": "false", "aria-autocomplete": "list", autocomplete: "off" });
+    const wrap = h("div", { class: "field" }, h("span", {}, f.label), input);
+    let list = null;
+    const close = () => { list?.remove(); list = null; input.setAttribute("aria-expanded", "false"); };
+    input.addEventListener("input", () => {
+      S.form[f.key] = null;  // typing alone never commits a value; a suggestion must be chosen
+      close();
+      const q = input.value.trim().toLowerCase();
+      if (q.length < 2) return;
+      const hits = f.suggestions.filter(s => s.toLowerCase().includes(q)).slice(0, 6);
+      if (!hits.length) return;
+      list = h("ul", { role: "listbox", "aria-label": f.label + " " + L.suggestions },
+        ...hits.map(s => h("li", { role: "option", tabindex: "-1", onclick: () => { input.value = s; S.form[f.key] = s; close(); } }, s)));
+      wrap.append(list); input.setAttribute("aria-expanded", "true");
+    });
+    return wrap;
+  }
+  function dateField(f) {
+    if (f.default) S.form[f.key] = f.default;
+    const btn = h("button", { type: "button", "aria-label": f.label, "aria-expanded": "false" }, f.label + ": " + (S.form[f.key] || L.addDate));
+    const wrap = h("div", { class: "field" }, btn);
+    let cal = null, pending = null;
+    btn.addEventListener("click", () => {
+      if (cal) { cal.remove(); cal = null; btn.setAttribute("aria-expanded", "false"); return; }
+      btn.setAttribute("aria-expanded", "true");
+      cal = h("div", { class: "calendar", role: "dialog", "aria-label": f.label + " " + L.calendar },
+        h("div", { class: "caption" }, f.month),
+        ...f.days.map(d => h("button", { type: "button", "aria-label": d, "aria-pressed": "false", onclick: e => {
+          pending = d; S.pending[f.key] = d; cal.querySelectorAll("[aria-pressed]").forEach(b => b.setAttribute("aria-pressed", "false"));
+          e.currentTarget.setAttribute("aria-pressed", "true"); } }, d.split(" ").pop())),
+        h("button", { type: "button", class: "done", onclick: () => {
+          if (pending) { S.form[f.key] = pending; btn.textContent = f.label + ": " + pending; }
+          delete S.pending[f.key]; cal.remove(); cal = null; btn.setAttribute("aria-expanded", "false"); } }, L.done));
+      wrap.append(cal);
+    });
+    return wrap;
+  }
+  function selectField(f) {
+    S.form[f.key] = f.default || f.options[0];
+    const sel = h("select", { "aria-label": f.label, onchange: e => { S.form[f.key] = e.target.value; } },
+      ...f.options.map(o => h("option", { value: o, selected: o === S.form[f.key] }, o)));
+    return h("div", { class: "field" }, h("span", {}, f.label), sel);
+  }
+  function radioField(f) {
+    S.form[f.key] = f.default || f.options[0];
+    return h("fieldset", { class: "field" }, h("legend", {}, f.label),
+      ...f.options.map(o => h("label", {}, h("input", { type: "radio", name: f.key, value: o, checked: o === S.form[f.key], onchange: () => { S.form[f.key] = o; } }), " " + o)));
+  }
+  function textField(f) {
+    const input = h("input", { type: "search", "aria-label": f.label, placeholder: f.label, oninput: e => { S.form[f.key] = e.target.value.trim() || null; } });
+    return h("div", { class: "field" }, h("span", {}, f.label), input);
+  }
+  const builders = { combobox: comboField, date: dateField, select: selectField, radio: radioField, text: textField };
+  const inline = spec.filters.filter(f => f.inline);
+  const form = h("form", { class: "search", onsubmit: e => { e.preventDefault(); submit(); } },
+    ...spec.fields.map(f => builders[f.kind](f)), ...inline.map(f => h("div", { class: "field" }, filterControl(f, false))),
+    h("button", { type: "submit" }, L.search));
+
+  // ---- results with filters -----------------------------------------------------------------------------
+  const main = h("main");
+  function submit() {
+    S.submitted = { ...S.form };
+    main.replaceChildren(h("p", { class: "loading", role: "status" }, L.loading));
+    setTimeout(renderResults, 250);
+  }
+  function filterControl(f, live = true) {
+    const set = v => { S.filters[f.key] = v; if (live) renderList(); };
+    if (f.kind === "checkbox") return h("label", {}, h("input", { type: "checkbox", checked: S.filters[f.key], onchange: e => set(e.target.checked) }), " " + f.label);
+    if (f.kind === "switch") return h("button", { type: "button", role: "switch", "aria-checked": String(S.filters[f.key]), onclick: e => {
+      const v = e.currentTarget.getAttribute("aria-checked") !== "true"; e.currentTarget.setAttribute("aria-checked", String(v)); set(v); } }, f.label);
+    if (f.kind === "chip") return h("button", { type: "button", class: "chip", "aria-pressed": String(S.filters[f.key]), onclick: e => {
+      const v = e.currentTarget.getAttribute("aria-pressed") !== "true"; e.currentTarget.setAttribute("aria-pressed", String(v)); set(v); } }, f.label);
+    if (f.kind === "radio") return h("fieldset", {}, h("legend", {}, f.label),
+      ...f.options.map(o => h("label", {}, h("input", { type: "radio", name: "flt-" + f.key, checked: S.filters[f.key] === o, onchange: () => set(o) }), " " + o)));
+    if (f.kind === "select") return h("label", {}, f.label + " ",
+      h("select", { "aria-label": f.label, onchange: e => set(e.target.value || null) }, h("option", { value: "" }, L.any), ...f.options.map(o => h("option", { value: o, selected: S.filters[f.key] === o }, o))));
+  }
+  let listEl = null;
+  function matches(item) {
+    for (const f of spec.filters) {
+      const v = S.filters[f.key];
+      if ((f.kind === "checkbox" || f.kind === "switch" || f.kind === "chip") && v && !item.tags.includes(f.key)) return false;
+      if ((f.kind === "radio" || f.kind === "select") && v && item.attrs[f.key] !== v) return false;
+    }
+    return true;
+  }
+  function renderList() {
+    if (!listEl) return;
+    let items = spec.items.filter(matches);
+    if (spec.sort && S.sort === spec.sort.options[1]) items = [...items].sort((a, b) => a.price - b.price);
+    listEl.replaceChildren(h("p", { role: "status" }, items.length + " " + L.results),
+      ...items.map(it => h("li", {}, h("strong", {}, it.name), h("div", {}, it.summary),
+        h("a", { href: "#item-" + it.id, onclick: e => { e.preventDefault(); openItem(it); } }, L.view + " " + it.name))));
+  }
+  function renderResults() {
+    listEl = h("ul", { class: "results", "aria-label": L.results });
+    const sort = spec.sort ? h("label", {}, spec.sort.label + " ",
+      h("select", { "aria-label": spec.sort.label, onchange: e => { S.sort = e.target.value; renderList(); } }, ...spec.sort.options.map(o => h("option", { value: o }, o)))) : null;
+    main.replaceChildren(h("aside", { "aria-label": L.filters }, h("h2", {}, L.filters), ...spec.filters.filter(f => !f.inline).map(f => h("div", {}, filterControl(f)))),
+      h("section", {}, h("h2", {}, L.resultsFor + " " + Object.values(S.submitted).filter(Boolean).join(", ")), sort, listEl));
+    renderList();
+  }
+  function openItem(it) {
+    S.opened = it.id; S.openedWith = { submitted: S.submitted, filters: { ...S.filters }, sort: S.sort };
+    main.replaceChildren(h("article", {}, h("h1", {}, it.name), h("p", {}, it.summary), h("p", {}, it.detail),
+      h("button", { type: "button", onclick: () => { S.reserved = true; } }, L.reserve),
+      h("a", { href: "#back", onclick: e => { e.preventDefault(); renderResults(); } }, L.back)));
+  }
+  if (S.layout === "results_first") {
+    // popular items are visible (and openable) before any search, including the target
+    main.replaceChildren(h("section", {}, h("h2", {}, L.popular),
+      h("ul", { class: "results" }, ...spec.items.map(it => h("li", {}, h("strong", {}, it.name), h("div", {}, it.summary),
+        h("a", { href: "#item-" + it.id, onclick: e => { e.preventDefault(); openItem(it); } }, L.view + " " + it.name))))));
+  }
+  root.append(header(), h("h1", { style: "padding:0 20px" }, L.title), form, main,
+    h("footer", {}, spec.footer));
+})();
+</script>
+</body>
+</html>
