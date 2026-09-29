@@ -6,7 +6,7 @@ For each public item this reports how many of its 13-grams appear anywhere in tr
 that shares the most. It also flags training questions whose option set equals a public item's option set.
 
     python scripts/contamination_check.py --bench path/to/jevbench/datasets/public \
-        --train data/train/g14_ambiguity data/train/jevfast_v2_g10 ...
+        --train data/train/desktop data/train/counterexamples ...
 """
 
 from __future__ import annotations

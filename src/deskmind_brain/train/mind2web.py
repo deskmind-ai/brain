@@ -1,6 +1,6 @@
-"""Mind2Web (osunlp/Mind2Web train split) -> element-target training items in the browser eval's format.
+"""Mind2Web (osunlp/Mind2Web train split) -> element-target training items in a compact page format.
 
-Each action step becomes one Choice question: the page is rendered like `browser/snapshot.compact` (`[ref] role
+Each action step becomes one Choice question: the page is rendered compactly (`[ref] role
 "name"` per actionable element, visible text in between), the goal is the task plus the most recent actions, and
 the options are the actionable elements. Real pages hold hundreds of candidates, so each item keeps a contiguous
 window of 10-90 elements around the target (roughly one screen, matching the eval's p50 30 / max 98 options) at a

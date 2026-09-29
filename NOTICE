@@ -2,3 +2,7 @@ DeskMind Brain
 Copyright 2026 The DeskMind authors
 
 Model weights are fine-tuned from Qwen3.5 (Apache-2.0, Alibaba Cloud).
+
+Training data used for the released weights includes Mind2Web (osunlp/Mind2Web, CC BY 4.0) and public Hugging Face
+datasets, each used under its own licence, plus sandbox desktop tasks and synthetic requests written for this
+project. No third-party data is redistributed in this repository; see docs/training.md.
