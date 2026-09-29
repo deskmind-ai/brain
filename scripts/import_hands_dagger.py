@@ -234,6 +234,14 @@ def to_item(row: dict, rid: str) -> dict | None:
             continue
         options = list(q["criteria"])
         questions[qid] = q
+        probs = {k: float(v) for k, v in ((ans or {}).get("probabilities") or {}).items() if k in q["criteria"]}
+        if sum(1 for v in probs.values() if v >= 0.2) > 1:
+            # more than one right answer (e.g. the gym oracle v2: CLICK the row's play button or OPEN the row itself)
+            total = sum(probs.values())
+            probs = {o: probs.get(o, 0.0) / total for o in options}
+            references[qid] = {"probs": probs, "n_sets": 1, "soft": True}
+            teacher[qid] = {o: 0.95 * p + 0.05 / len(options) for o, p in probs.items()}
+            continue
         references[qid] = {"probs": {o: float(o == gold) for o in options}, "n_sets": 1, "soft": False}
         teacher[qid] = smooth(options, gold)
     if "operation" not in questions:

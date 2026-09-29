@@ -57,7 +57,11 @@ def build_examples(items: list[EvalItem], tokenizer, label_ids: dict[str, int], 
             options = question.options()
             if len(options) < 2:
                 continue
-            gold = max(item.references[qid].probs, key=item.references[qid].probs.get)
+            ref = item.references[qid].probs
+            top = max(ref.values())
+            # several right answers (soft labels, e.g. the gym's "CLICK the play button or OPEN the row"): the CE
+            # term takes one of them at random per example, so it does not always push toward the first
+            gold = rng.choice([o for o, p in ref.items() if p >= top - 1e-9])
             teacher = teacher_all[qid]
             if question.type == "choice" and len(options) > round_size:
                 others = [o for o in options if o != gold]
