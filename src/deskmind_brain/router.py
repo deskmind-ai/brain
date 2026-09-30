@@ -14,6 +14,8 @@ from __future__ import annotations
 import json
 
 RISKY_OPS = {"DONE", "BLOCKED"}
+#: hands' action effects that leave it open whether anything happened (state.last_effect).
+UNCONFIRMED_EFFECTS = {"unverifiable", "suspected_noop"}
 TERMINAL = {"DONE", "BLOCKED", "ASK"}
 # Chords that cannot lose work or act outwardly may run on the fast tier's word; every other chord (undo, parent
 # folder, delete, send, paste-move ...) escalates. In the first real-desktop router run 70 of 72 escalated chords were
@@ -59,6 +61,10 @@ def decide(body: dict, answers: dict, threshold: float, judge_threshold: float) 
     conf = top_prob(answers["operation"])
     for h in heads_for(op or "", questions):
         conf = min(conf, top_prob(answers.get(h) or {}))
+    if op == "DONE" and ((body.get("state") or {}).get("last_effect") in UNCONFIRMED_EFFECTS):
+        # Finishing right after an action that could not be confirmed (hands' last_effect): checked by the strong
+        # tier like any DONE, and said so -- a pixel check missed a song pausing, and the run said DONE over it.
+        return True, "unverified_last", conf
     if op in RISKY_OPS:
         return True, f"risky_{op}", conf
     if op == "KEY":
@@ -92,7 +98,7 @@ def route(body: dict, fast_answers: dict, strong, threshold: float = 0.94, judge
             own = {"operation", *heads_for(op, body.get("questions") or {})}
             answers = {**fast_answers, **{k: v for k, v in answers.items() if k in own}}
             confirmed = op == (fast_answers.get("operation") or {}).get("choice")
-        if keep_done_over_undo and reason == "risky_DONE" and is_undo_click(body, answers):
+        if keep_done_over_undo and reason in ("risky_DONE", "unverified_last") and is_undo_click(body, answers):
             answers, reason, escalate = fast_answers, "done_kept_over_undo", False
     record = {"by": "strong" if escalate else "fast", "reason": reason, "fast_conf": round(conf, 4)}
     if confirmed:

@@ -85,7 +85,7 @@ def main() -> None:
                 escalate, reason, conf = decide(body, fast.get("answers") or {}, args.threshold, args.judge_threshold)
                 t_fast = time.time() - t0
                 out = call(args.strong, body, strong_key, args.strong_model) if escalate else fast
-                if escalate and args.keep_done_over_undo and reason == "risky_DONE" and is_undo_click(body, out.get("answers") or {}):
+                if escalate and args.keep_done_over_undo and reason in ("risky_DONE", "unverified_last") and is_undo_click(body, out.get("answers") or {}):
                     # seen on the real-desktop diagnostic suite: the 4B overruled correct DONEs from the fast tier by
                     # undoing the finished moves, then looped move/undo until the budget ran out. Undoing is never how a
                     # goal gets finished.
