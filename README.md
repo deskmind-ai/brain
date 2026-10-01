@@ -87,7 +87,8 @@ curl -s localhost:8793/v1/systemone -H 'Content-Type: application/json' -d @exam
 and its targets.
 
 The 4B is 4.2 GB to download and the 0.8B 0.8 GB. If `hf download` fails with a `CAS Client Error` (the Xet transfer
-path), retry with `HF_HUB_DISABLE_XET=1` in front of the command.
+path), retry with `HF_HUB_DISABLE_XET=1` in front of the command. In mainland China, ModelScope carries the same files:
+`uvx modelscope download --model gxcsoccer/brain-4b --local-dir models/brain-4b` (and `gxcsoccer/brain-0.8b`).
 
 Two-tier serving in one process (the 0.8B answers, and risky or unsure steps go to the 4B):
 

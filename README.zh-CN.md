@@ -72,7 +72,8 @@ curl -s localhost:8793/v1/systemone -H 'Content-Type: application/json' -d @exam
 `examples/request.json` 是一个沙箱 Finder 任务里的真实一步：页面状态，加上操作及其目标的各个问题。
 
 4B 下载约 4.2 GB，0.8B 约 0.8 GB。如果 `hf download` 报 `CAS Client Error`（Xet 传输通道出错），在命令前加
-`HF_HUB_DISABLE_XET=1` 重试。
+`HF_HUB_DISABLE_XET=1` 重试。国内网络可以从 ModelScope 下载同样的文件：
+`uvx modelscope download --model gxcsoccer/brain-4b --local-dir models/brain-4b`（0.8B 为 `gxcsoccer/brain-0.8b`）。
 
 两级路由，一个进程搞定（0.8B 先答，有风险或没把握的步骤交给 4B）：
 
