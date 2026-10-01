@@ -420,6 +420,60 @@ nvtx = [
 ]
 
 [[package]]
+name = "deskmind-brain"
+version = "0.2.0"
+source = { editable = "." }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.optional-dependencies]
+cuda = [
+    { name = "flash-linear-attention", marker = "sys_platform == 'linux'" },
+]
+eval = [
+    { name = "pyarrow" },
+]
+local = [
+    { name = "accelerate" },
+    { name = "modelscope" },
+    { name = "torch" },
+    { name = "transformers" },
+]
+mlx = [
+    { name = "mlx", marker = "sys_platform == 'darwin'" },
+    { name = "mlx-lm", marker = "sys_platform == 'darwin'" },
+]
+train = [
+    { name = "lxml" },
+    { name = "peft" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "accelerate", marker = "extra == 'local'", specifier = ">=1.15.0" },
+    { name = "flash-linear-attention", marker = "sys_platform == 'linux' and extra == 'cuda'", specifier = ">=0.5.2" },
+    { name = "lxml", marker = "extra == 'train'", specifier = ">=5" },
+    { name = "mlx", marker = "sys_platform == 'darwin' and extra == 'mlx'", specifier = ">=0.32,<0.32.3" },
+    { name = "mlx-lm", marker = "sys_platform == 'darwin' and extra == 'mlx'", specifier = ">=0.31,<0.32" },
+    { name = "modelscope", marker = "extra == 'local'", specifier = ">=1.40.1" },
+    { name = "peft", marker = "extra == 'train'", specifier = ">=0.19" },
+    { name = "pyarrow", marker = "extra == 'eval'", specifier = ">=25.0.1" },
+    { name = "pydantic", specifier = ">=2.7" },
+    { name = "torch", marker = "extra == 'local'", specifier = ">=2.14.0" },
+    { name = "transformers", marker = "extra == 'local'", specifier = ">=5.17.0,<5.18" },
+]
+provides-extras = ["eval", "local", "cuda", "mlx", "train"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8" }]
+
+[[package]]
 name = "einops"
 version = "0.8.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1105,58 +1159,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/c2/f3/d86c845465a2723ad7e1e5c36dcd75ddb82898b3f53be47ebd429fb2fa5d/nvidia_nvtx-13.0.85-py3-none-manylinux1_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:4936d1d6780fbe68db454f5e72a42ff64d1fd6397df9f363ae786930fd5c1cd4", size = 148047, upload-time = "2025-09-04T08:29:01.761Z" },
     { url = "https://files.pythonhosted.org/packages/a8/64/3708a90d1ebe202ffdeb7185f878a3c84d15c2b2c31858da2ce0583e2def/nvidia_nvtx-13.0.85-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:cb7780edb6b14107373c835bf8b72e7a178bac7367e23da7acb108f973f157a6", size = 148878, upload-time = "2025-09-04T08:28:53.627Z" },
 ]
-
-[[package]]
-name = "deskmind-brain"
-version = "0.2.0"
-source = { editable = "." }
-dependencies = [
-    { name = "pydantic" },
-]
-
-[package.optional-dependencies]
-cuda = [
-    { name = "flash-linear-attention", marker = "sys_platform == 'linux'" },
-]
-eval = [
-    { name = "pyarrow" },
-]
-local = [
-    { name = "accelerate" },
-    { name = "modelscope" },
-    { name = "torch" },
-    { name = "transformers" },
-]
-mlx = [
-    { name = "mlx-lm", marker = "sys_platform == 'darwin'" },
-]
-train = [
-    { name = "lxml" },
-    { name = "peft" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "accelerate", marker = "extra == 'local'", specifier = ">=1.15.0" },
-    { name = "flash-linear-attention", marker = "sys_platform == 'linux' and extra == 'cuda'", specifier = ">=0.5.2" },
-    { name = "lxml", marker = "extra == 'train'", specifier = ">=5" },
-    { name = "mlx-lm", marker = "sys_platform == 'darwin' and extra == 'mlx'", specifier = ">=0.31" },
-    { name = "modelscope", marker = "extra == 'local'", specifier = ">=1.40.1" },
-    { name = "peft", marker = "extra == 'train'", specifier = ">=0.19" },
-    { name = "pyarrow", marker = "extra == 'eval'", specifier = ">=25.0.1" },
-    { name = "pydantic", specifier = ">=2.7" },
-    { name = "torch", marker = "extra == 'local'", specifier = ">=2.14.0" },
-    { name = "transformers", marker = "extra == 'local'", specifier = ">=5.17.0" },
-]
-provides-extras = ["eval", "local", "cuda", "mlx", "train"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8" }]
 
 [[package]]
 name = "packaging"
