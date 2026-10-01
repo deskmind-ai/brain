@@ -19,6 +19,7 @@ import json
 import threading
 import time
 import uuid
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from pydantic import ValidationError
@@ -153,6 +154,19 @@ def make_handler(server: Server):
     return Handler
 
 
+def default_threshold(spec: str, fallback: float = 0.94) -> float:
+    """The routing threshold a release ships with: `router_threshold` in the fast tier's deskmind.json.
+
+    Each round's fast model has its own confidence spread (G18b's 0.8B sits at 0.94-0.97), so the threshold travels with
+    the weights instead of being a constant of the server.
+    """
+    path = Path(spec.split(":", 1)[-1]) / "deskmind.json"
+    try:
+        return float(json.loads(path.read_text()).get("router_threshold", fallback))
+    except (OSError, ValueError):
+        return fallback
+
+
 def main() -> None:
     p = argparse.ArgumentParser(prog="deskmind-brain-serve")
     p.add_argument("--predictor", required=True, help="any deskmind-brain-eval predictor spec, e.g. mlx:models/brain-4b")
@@ -164,11 +178,14 @@ def main() -> None:
                    help="agent requests: score the operation first, then only the heads that operation needs")
     p.add_argument("--escalate-to", help="predictor spec of a stronger tier served in the same process (routing rules: "
                    "deskmind_brain.router); --predictor is then the fast tier")
-    p.add_argument("--threshold", type=float, default=0.94, help="with --escalate-to: escalate below this confidence")
+    p.add_argument("--threshold", type=float, help="with --escalate-to: escalate below this confidence (default: the "
+                   "fast tier's deskmind.json router_threshold, else 0.94)")
     p.add_argument("--no-keep-done-over-undo", action="store_true",
                    help="with --escalate-to: let the strong tier overrule a fast DONE with an undo click")
     p.add_argument("--routing-log", help="with --escalate-to: append one metadata line per request (who answered, why)")
     args = p.parse_args()
+    if args.threshold is None:
+        args.threshold = default_threshold(args.predictor)
     server = Server(args.predictor, args.model_name, args.cache_size, args.escalate_to, args.threshold,
                     not args.no_keep_done_over_undo, args.routing_log)
     if args.two_stage:
