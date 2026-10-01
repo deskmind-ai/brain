@@ -10,7 +10,7 @@
   <a href="https://huggingface.co/deskmind"><img alt="Models on Hugging Face" src="https://img.shields.io/badge/%F0%9F%A4%97%20models-deskmind-C95536"></a>
   <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-262B28">
   <img alt="MLX on Apple Silicon" src="https://img.shields.io/badge/MLX-Apple%20Silicon-262B28">
-  <a href="docs/results.md"><img alt="bench v23: 92%" src="https://img.shields.io/badge/bench%20v23-92%25-C95536"></a>
+  <a href="docs/results.md"><img alt="bench v25: 39/39" src="https://img.shields.io/badge/bench%20v25-39%2F39-C95536"></a>
 </p>
 
 <p align="center">
@@ -49,24 +49,28 @@ instead of free text:
 - **Two tiers.** The 0.8B model answers by default. When it is unsure, or when a step is costly to get wrong (finishing
   a task, undoing work, unusual shortcuts), `scripts/router_serve.py` hands the step to the 4B model.
 
-## Results (September 2026)
+## Results (October 2026, release G18b)
 
-Real macOS desktop, 13 sandbox tasks × 3 runs, strict pass. The suite is
-[deskmind-ai/bench](https://github.com/deskmind-ai/bench) v23.
+Real macOS desktop, 13 sandbox tasks × 3 runs, strict pass, on
+[deskmind-ai/bench](https://github.com/deskmind-ai/bench) v25, run through the DeskMind app on an M4 Pro:
 
-| | pass | false "done" | time per step (p50) |
+| | pass | false "done" | decision time (p50) |
 |---|---|---|---|
-| Jev (TypeSafe, cloud) | 87% | 2 | 0.36 s |
-| **DeskMind router** (0.8B → 4B, 8-bit, M4 Pro) | **92%** | **0** | **0.59 s** |
+| **DeskMind router G18b** (0.8B → 4B, 8-bit, threshold 0.96) | **39/39** | **0** | 0.48 s when the 0.8B answers, 3.6 s when the 4B checks (about 70% of steps) |
+| DeskMind router G14 (earlier release) | 36/39 | 0 | 0.57 s |
 
-JevBench v1.4.2: on the 231 public items (the board's `public_accuracy` column), DeskMind Brain 4B scores **0.866**,
-the same as Jev 1.13. The board's headline JevBench Score (0–100) also weighs sealed items, calibration, speed and cost;
-we have not been scored on the sealed set yet.
+On the earlier suite v23, the G14 router passed 35/38 (92%) and Jev (TypeSafe, cloud) 33/38 (87%); there is no Jev
+run on v25. JevBench v1.4.2, 231 public items (the board's `public_accuracy` column): G18b 4B **0.835**, G14 4B 0.866.
+The board's headline JevBench Score (0–100) also weighs sealed items, calibration, speed and cost; we have not been
+scored on the sealed set yet. Details: [docs/results.md](docs/results.md).
 
 **Known gaps:**
-- **One unsolved task:** extracting rows from a web page into a new document (Jev does not solve it either); the
-  model types the rows into the save dialog's file-name field.
-- **Slow steps:** p95 is about 4.6 s, on steps that confirm a task is done.
+- **Speed:** the G18b 0.8B is confident in a narrow band, so most steps go to the 4B and a typical decision takes about
+  3 s; the next round aims to widen the fast path.
+- **General judgement:** G18b's 4B lost ground on JevBench's hard tier (85 → 76 of 111) while it gained on the real
+  desktop.
+- **Saying "done":** on one task (Chinese exact text) the file was right but the model kept going until the step
+  budget ran out.
 
 Method and full tables: [docs/results.md](docs/results.md).
 
@@ -74,7 +78,7 @@ Method and full tables: [docs/results.md](docs/results.md).
 
 ```bash
 uv sync --extra mlx
-uv run hf download deskmind/brain-4b --local-dir models/brain-4b
+uv run hf download deskmind/brain-4b --revision g18b-q8 --local-dir models/brain-4b
 uv run deskmind-brain-serve --predictor mlx:models/brain-4b --port 8793 --two-stage
 curl -s localhost:8793/v1/systemone -H 'Content-Type: application/json' -d @examples/request.json
 ```
@@ -85,10 +89,13 @@ and its targets.
 Two-tier serving in one process (the 0.8B answers, and risky or unsure steps go to the 4B):
 
 ```bash
-uv run hf download deskmind/brain-0.8b --local-dir models/brain-0.8b
+uv run hf download deskmind/brain-0.8b --revision g18b-q8 --local-dir models/brain-0.8b
 uv run deskmind-brain-serve --predictor mlx:models/brain-0.8b --escalate-to mlx:models/brain-4b \
   --two-stage --port 8796
 ```
+
+The routing threshold comes with the weights (`router_threshold` in the 0.8B's `deskmind.json`, 0.96 for G18b);
+`--threshold` overrides it.
 
 Each reply carries a `routing` record: who answered, and why. The tiers can also run as separate servers, with the 0.8B
 on 8794 and the 4B on 8793: `uv run python scripts/router_serve.py --fast http://127.0.0.1:8794 --strong http://127.0.0.1:8793

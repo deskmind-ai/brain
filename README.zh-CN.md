@@ -10,7 +10,7 @@
   <a href="https://huggingface.co/deskmind"><img alt="Models on Hugging Face" src="https://img.shields.io/badge/%F0%9F%A4%97%20models-deskmind-C95536"></a>
   <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-262B28">
   <img alt="MLX on Apple Silicon" src="https://img.shields.io/badge/MLX-Apple%20Silicon-262B28">
-  <a href="docs/results.zh-CN.md"><img alt="bench v23: 92%" src="https://img.shields.io/badge/bench%20v23-92%25-C95536"></a>
+  <a href="docs/results.zh-CN.md"><img alt="bench v25: 39/39" src="https://img.shields.io/badge/bench%20v25-39%2F39-C95536"></a>
 </p>
 
 <p align="center">
@@ -42,20 +42,21 @@
 - **接口可直接替换。** `POST /v1/systemone` 接收 `{state, questions}`、返回 `{answers}`，和 System One 类决策接口格式一致，已有客户端只需改服务地址。
 - **两级路由。** 默认由 0.8B 回答。遇到没把握的步骤，或容易出大错的步骤（宣布完成、撤销、少见的快捷键），`scripts/router_serve.py` 会交给 4B 复核。
 
-## 成绩（2026 年 9 月）
+## 成绩（2026 年 10 月，发布版 G18b）
 
-真实 macOS 桌面，13 个沙箱任务，每个跑 3 轮，按严格标准判定通过。测试集为 [deskmind-ai/bench](https://github.com/deskmind-ai/bench) v23。
+真实 macOS 桌面，13 个沙箱任务，每个跑 3 轮，按严格标准判定通过。测试集为 [deskmind-ai/bench](https://github.com/deskmind-ai/bench) v25，在 M4 Pro 上通过 DeskMind app 运行：
 
-| | 通过率 | 没做完就说完成 | 每步耗时（中位数） |
+| | 通过 | 没做完就说完成 | 每次决策耗时（中位数） |
 |---|---|---|---|
-| Jev（TypeSafe，云端） | 87% | 2 | 0.36 秒 |
-| **DeskMind 路由**（0.8B → 4B，8 位，M4 Pro） | **92%** | **0** | **0.59 秒** |
+| **DeskMind 路由 G18b**（0.8B → 4B，8 位，门槛 0.96） | **39/39** | **0** | 0.8B 直接回答 0.48 秒，交给 4B 复核 3.6 秒（约 70% 的步骤） |
+| DeskMind 路由 G14（上一版） | 36/39 | 0 | 0.57 秒 |
 
-JevBench v1.4.2：在 231 道公开题上（即榜单的 `public_accuracy` 一列），DeskMind Brain 4B 得 **0.866**，与 Jev 1.13 相同。榜单主分（JevBench Score，0–100）还计入密封题、校准、速度和成本，我们还没有密封题成绩。
+在较早的 v23 测试集上，G14 路由通过 35/38（92%），Jev（TypeSafe，云端）33/38（87%）；v25 上没有 Jev 的成绩。JevBench v1.4.2 的 231 道公开题（即榜单的 `public_accuracy` 一列）：G18b 4B **0.835**，G14 4B 0.866。榜单主分（JevBench Score，0–100）还计入密封题、校准、速度和成本，我们还没有密封题成绩。详情见 [docs/results.zh-CN.md](docs/results.zh-CN.md)。
 
 **已知不足：**
-- **没解决的任务：** 还剩 1 个：从网页提取数据写进新文档（Jev 也没做成）。模型会把数据行误填进「存储」对话框的文件名栏。
-- **慢的步骤：** 最慢 5% 的步骤约 4.6 秒，主要是确认任务是否完成的那一步。
+- **速度：** G18b 的 0.8B 把握集中在一个窄段，大部分步骤交给了 4B，一次决策通常约 3 秒；下一轮的目标是把快速路径的比例拿回来。
+- **通用判断：** G18b 的 4B 在 JevBench hard 档退步（111 道中 85 → 76），换来了真实桌面上的提升。
+- **宣布完成：** 有一个任务（中文精确文本）文件已经写对，模型却一直没有宣布完成，直到用完步数。
 
 方法和完整数据见 [docs/results.zh-CN.md](docs/results.zh-CN.md)。
 
@@ -63,7 +64,7 @@ JevBench v1.4.2：在 231 道公开题上（即榜单的 `public_accuracy` 一�
 
 ```bash
 uv sync --extra mlx
-uv run hf download deskmind/brain-4b --local-dir models/brain-4b
+uv run hf download deskmind/brain-4b --revision g18b-q8 --local-dir models/brain-4b
 uv run deskmind-brain-serve --predictor mlx:models/brain-4b --port 8793 --two-stage
 curl -s localhost:8793/v1/systemone -H 'Content-Type: application/json' -d @examples/request.json
 ```
@@ -73,10 +74,12 @@ curl -s localhost:8793/v1/systemone -H 'Content-Type: application/json' -d @exam
 两级路由，一个进程搞定（0.8B 先答，有风险或没把握的步骤交给 4B）：
 
 ```bash
-uv run hf download deskmind/brain-0.8b --local-dir models/brain-0.8b
+uv run hf download deskmind/brain-0.8b --revision g18b-q8 --local-dir models/brain-0.8b
 uv run deskmind-brain-serve --predictor mlx:models/brain-0.8b --escalate-to mlx:models/brain-4b \
   --two-stage --port 8796
 ```
+
+路由门槛随权重一起发布（0.8B 的 `deskmind.json` 里的 `router_threshold`，G18b 为 0.96）；`--threshold` 可以覆盖。
 
 每个回复都带一条 `routing` 记录，说明是谁答的、为什么。两级也可以拆成两个服务分开跑，0.8B 在 8794 端口，4B 在 8793 端口：`uv run python scripts/router_serve.py --fast http://127.0.0.1:8794 --strong http://127.0.0.1:8793 --keep-done-over-undo --port 8796`。
 
