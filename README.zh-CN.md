@@ -44,14 +44,16 @@
 
 ## 成绩（2026 年 10 月，发布版 G18b）
 
-真实 macOS 桌面，13 个沙箱任务，每个跑 3 轮，按严格标准判定通过。测试集为 [deskmind-ai/bench](https://github.com/deskmind-ai/bench) v25，在 M4 Pro 上通过 DeskMind app 运行：
+真实 macOS 桌面，13 个沙箱任务，每个跑 3 轮，按严格标准判定通过。测试集为 [deskmind-ai/bench](https://github.com/deskmind-ai/bench) v25，在 M4 Pro（48 GB）上通过 DeskMind app 运行。app v0.3.0 搭载 G18b，v0.2.0 搭载的是 G14。
 
 | | 通过 | 没做完就说完成 | 每次决策耗时（中位数） |
 |---|---|---|---|
 | **DeskMind 路由 G18b**（0.8B → 4B，8 位，门槛 0.96） | **39/39** | **0** | 0.8B 直接回答 0.48 秒，交给 4B 复核 3.6 秒（约 70% 的步骤） |
 | DeskMind 路由 G14（上一版） | 36/39 | 0 | 0.57 秒 |
 
-在较早的 v23 测试集上，G14 路由通过 35/38（92%），Jev（TypeSafe，云端）33/38（87%）；v25 上没有 Jev 的成绩。JevBench v1.4.2 的 231 道公开题（即榜单的 `public_accuracy` 一列）：G18b 4B **0.835**，G14 4B 0.866。榜单主分（JevBench Score，0–100）还计入密封题、校准、速度和成本，我们还没有密封题成绩。详情见 [docs/results.zh-CN.md](docs/results.zh-CN.md)。
+G18b 这几轮关闭了 app 的可选检查和提示；全部 208 次决策的中位数为 2.85 秒（p95 9.82 秒）。
+
+在较早的 v23 测试集上，G14 路由通过 35/38（92%），Jev（TypeSafe，云端）33/38（87%）；v25 上没有 Jev 的成绩。JevBench v1.4.2 的 231 道公开题（即榜单的 `public_accuracy` 一列）：G18b 4B **0.835**（193/231），G18b 路由 0.797，G18b 0.8B 0.723，G14 4B 0.866。G18b 的训练数据与这些题目没有任何相同的 13 词片段，也没有相同的选项集合（0/231）。榜单主分（JevBench Score，0–100）还计入密封题、校准、速度和成本，我们还没有密封题成绩。详情见 [docs/results.zh-CN.md](docs/results.zh-CN.md)。
 
 **已知不足：**
 - **速度：** G18b 的 0.8B 把握集中在一个窄段，大部分步骤交给了 4B，一次决策通常约 3 秒；下一轮的目标是把快速路径的比例拿回来。
@@ -71,9 +73,9 @@ curl -s localhost:8793/v1/systemone -H 'Content-Type: application/json' -d @exam
 
 `examples/request.json` 是一个沙箱 Finder 任务里的真实一步：页面状态，加上操作及其目标的各个问题。
 
-4B 下载约 4.2 GB，0.8B 约 0.8 GB。如果 `hf download` 报 `CAS Client Error`（Xet 传输通道出错），在命令前加
+4B 下载约 4.5 GB，0.8B 约 0.8 GB。如果 `hf download` 报 `CAS Client Error`（Xet 传输通道出错），在命令前加
 `HF_HUB_DISABLE_XET=1` 重试。国内网络可以从 ModelScope 下载同样的文件：
-`uvx modelscope download --model gxcsoccer/brain-4b --local-dir models/brain-4b`（0.8B 为 `gxcsoccer/brain-0.8b`）。
+`uvx modelscope download --model gxcsoccer/brain-4b --revision g18b-q8 --local-dir models/brain-4b`（0.8B 为 `gxcsoccer/brain-0.8b`，同样加 `--revision g18b-q8`）。
 
 两级路由，一个进程搞定（0.8B 先答，有风险或没把握的步骤交给 4B）：
 
@@ -85,7 +87,12 @@ uv run deskmind-brain-serve --predictor mlx:models/brain-0.8b --escalate-to mlx:
 
 路由门槛随权重一起发布（0.8B 的 `deskmind.json` 里的 `router_threshold`，G18b 为 0.96）；`--threshold` 可以覆盖。
 
-每个回复都带一条 `routing` 记录，说明是谁答的、为什么。两级也可以拆成两个服务分开跑，0.8B 在 8794 端口，4B 在 8793 端口：`uv run python scripts/router_serve.py --fast http://127.0.0.1:8794 --strong http://127.0.0.1:8793 --keep-done-over-undo --port 8796`。
+每个回复都带一条 `routing` 记录，说明是谁答的、为什么。两级也可以拆成两个服务分开跑，0.8B 在 8794 端口，4B 在 8793 端口。`router_serve.py` 不读 `deskmind.json`，门槛要自己传：
+
+```bash
+uv run python scripts/router_serve.py --fast http://127.0.0.1:8794 --strong http://127.0.0.1:8793 \
+  --threshold 0.96 --keep-done-over-undo --port 8796
+```
 
 ## 模型
 
@@ -94,7 +101,7 @@ uv run deskmind-brain-serve --predictor mlx:models/brain-0.8b --escalate-to mlx:
 | `deskmind/brain-0.8b` | Qwen3.5-0.8B + LoRA（已合并） | Apache-2.0 |
 | `deskmind/brain-4b` | Qwen3.5-4B + LoRA（已合并） | Apache-2.0 |
 
-每个模型目录里都有一个 `deskmind.json`，记录训练时用的提示格式。
+当前发布版是两个模型的 `g18b-q8` 版本；更早的发布版保留在各自的分支上，见模型卡。每个模型目录里都有一个 `deskmind.json`，记录训练时用的提示格式。
 
 ## 训练
 
