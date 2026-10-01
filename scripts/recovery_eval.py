@@ -61,8 +61,8 @@ def main() -> None:
 
     for spec in args.chooser:
         name, _, base = spec.partition("=")
-        key = os.environ.get("SYSTEMONE_API_KEY", "local") if "typesafe.ai" in base else "local"
-        model = "jev-latest" if "typesafe.ai" in base else args.model
+        key = os.environ.get("SYSTEMONE_API_KEY", "local")  # local servers ignore it
+        model = args.model
         changed = correct = stuck = errors = 0
         records = []
         for row in rows:

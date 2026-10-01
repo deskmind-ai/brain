@@ -11,6 +11,9 @@ from typing import Protocol
 from deskmind_brain.eval.data import EvalItem, Prediction
 from deskmind_brain.types import to_answer
 
+LOCAL_SYSTEMONE_URL = "http://127.0.0.1:8787"  # deskmind-brain-serve's default --port
+LOCAL_SYSTEMONE_MODEL = "deskmind-brain-local"  # deskmind-brain-serve's default --model-name
+
 
 class Predictor(Protocol):
     name: str
@@ -42,12 +45,13 @@ class ReferencePredictor:
 
 
 class SystemOneAPIPredictor:
-    """Any server speaking TypeSafe's `POST /v1/systemone` (TypeSafe itself, or our own server later)."""
+    """Any server speaking `POST /v1/systemone`. Defaults to a local deskmind-brain-serve; a remote server needs an
+    explicit base URL (and usually a model name)."""
 
     def __init__(
         self,
-        base_url: str = "https://api.typesafe.ai",
-        model: str = "jev-latest",
+        base_url: str = LOCAL_SYSTEMONE_URL,
+        model: str = LOCAL_SYSTEMONE_MODEL,
         api_key: str | None = None,
         usd_per_mtok_input: float = 0.042,
         timeout_s: float = 120.0,
@@ -123,7 +127,7 @@ class CuaS1Predictor:
 def make_predictor(spec: str) -> Predictor:
     """Any spec below, optionally suffixed `~<temps.json>` to apply fitted temperatures (see eval/calibrate.py).
 
-    `uniform`, `reference`, `systemone[:model[@base_url]]`, `local[-noshare]:<model>[+<lora dir>]`, or `mlx:<model>[@4bit|@8bit]`."""
+    `uniform`, `reference`, `systemone[:model[@base_url]]` (default: the local server above), `local[-noshare]:<model>[+<lora dir>]`, or `mlx:<model>[@4bit|@8bit]`."""
     if "~" in spec:
         from deskmind_brain.eval.calibrate import CalibratedPredictor
 
@@ -138,7 +142,7 @@ def make_predictor(spec: str) -> Predictor:
     if spec.startswith("systemone"):
         rest = spec.partition(":")[2]
         model, _, base_url = rest.partition("@")
-        return SystemOneAPIPredictor(base_url=base_url or "https://api.typesafe.ai", model=model or "jev-latest")
+        return SystemOneAPIPredictor(base_url=base_url or LOCAL_SYSTEMONE_URL, model=model or LOCAL_SYSTEMONE_MODEL)
     if spec.startswith(("local:", "local-noshare:")):
         from deskmind_brain.eval.local_logits import LocalLogitsPredictor
 

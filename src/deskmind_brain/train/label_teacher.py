@@ -10,7 +10,7 @@ import argparse
 import json
 from pathlib import Path
 
-from deskmind_brain.eval.data import load_items, load_predictions, write_jsonl
+from deskmind_brain.eval.data import load_items, load_predictions, read_jsonl, write_jsonl
 from deskmind_brain.eval.predictors import make_predictor
 from deskmind_brain.eval.runner import run_predictions
 from deskmind_brain.train.data import OUT_DIR
@@ -26,6 +26,36 @@ def check_teacher(teacher: str) -> None:
     hosted = "systemone" in spec and ("@" not in spec or "typesafe" in spec)
     if hosted or "jev" in spec:
         raise SystemExit(f"refusing teacher {teacher!r}: hosted System One outputs are not used as training labels")
+
+
+_HOSTED_MARKERS = ("jev", "typesafe")
+_MODEL_FIELDS = ("model", "teacher", "source", "name")
+
+
+def check_predictions_file(path: Path) -> None:
+    """Refuse a predictions file that holds hosted System One answers, whatever --teacher says.
+
+    Refused: a path naming the hosted service (any directory, or the file name), files under a suite's `published/`
+    directory (answers shipped with a third-party eval suite, kept for score comparison only), and files whose records
+    name a hosted model in a model-like field."""
+    parts = [p.lower() for p in Path(path).resolve().parts]
+    if any("typesafe" in p for p in parts) or any(m in parts[-1] for m in _HOSTED_MARKERS):
+        raise SystemExit(f"refusing predictions {str(path)!r}: hosted System One outputs are not used as training labels")
+    if "published" in parts[:-1]:
+        raise SystemExit(f"refusing predictions {str(path)!r}: published third-party answers are for evaluation only")
+    for i, row in enumerate(read_jsonl(Path(path)), 1):
+        for key in _MODEL_FIELDS:
+            value = row.get(key)
+            if isinstance(value, str) and any(m in value.lower() for m in _HOSTED_MARKERS):
+                raise SystemExit(
+                    f"refusing predictions {str(path)!r}: record {i} has {key}={value!r}; "
+                    "hosted System One outputs are not used as training labels"
+                )
+
+
+def load_teacher_predictions(path: Path) -> dict:
+    check_predictions_file(path)
+    return load_predictions(path)
 
 
 def label(teacher: str = "local:Qwen/Qwen3.5-4B", data_dir: Path = OUT_DIR, limit: int | None = None) -> dict:
@@ -89,7 +119,7 @@ if __name__ == "__main__":
     args = p.parse_args()
     check_teacher(args.teacher)
     if args.from_predictions:
-        result = attach(args.data_dir, load_predictions(args.from_predictions), args.teacher, args.fill_gold, args.require_agree)
+        result = attach(args.data_dir, load_teacher_predictions(args.from_predictions), args.teacher, args.fill_gold, args.require_agree)
     else:
         result = label(args.teacher, args.data_dir, limit=args.limit)
     print(json.dumps(result, indent=2))

@@ -1,8 +1,8 @@
 """deskmind-brain-eval: build eval suites, run predictors, score runs.
 
-  deskmind-brain-eval fetch typesafe-public
-  deskmind-brain-eval predict --predictor uniform --out runs/uniform.jsonl
-  deskmind-brain-eval score --published --run uniform=runs/uniform.jsonl --common
+  deskmind-brain-eval fetch hf-tasks
+  deskmind-brain-eval predict --suite data/eval/hf_tasks --predictor uniform --out runs/uniform.jsonl
+  deskmind-brain-eval score --suite data/eval/hf_tasks --run uniform=runs/uniform.jsonl --common
 """
 
 from __future__ import annotations
@@ -19,7 +19,6 @@ from deskmind_brain.eval.predictors import make_predictor
 from deskmind_brain.eval.runner import run_predictions
 
 DEFAULT_DATA = Path("data")
-DEFAULT_SUITE = DEFAULT_DATA / "eval" / "typesafe_public"
 
 
 def _fmt(x: object, digits: int = 3) -> str:
@@ -164,7 +163,7 @@ def main(argv: list[str] | None = None) -> None:
     p.set_defaults(func=cmd_fetch)
 
     p = sub.add_parser("predict", help="run a predictor over a suite")
-    p.add_argument("--suite", type=Path, default=DEFAULT_SUITE)
+    p.add_argument("--suite", type=Path, required=True)
     p.add_argument("--predictor", required=True, help="uniform | reference | systemone[:model[@base_url]] | local[-noshare]:<model>[+<lora>] | mlx:<model>[@4bit|@8bit]; append ~<temps.json> to apply fitted temperatures")
     p.add_argument("--out", type=Path)
     p.add_argument("--limit", type=int)
@@ -172,8 +171,8 @@ def main(argv: list[str] | None = None) -> None:
     p.set_defaults(func=cmd_predict)
 
     p = sub.add_parser("score", help="score prediction files against a suite")
-    p.add_argument("--suite", type=Path, default=DEFAULT_SUITE)
-    p.add_argument("--published", action="store_true", help="include answers shipped with the suite (Jev, Opus, Sol)")
+    p.add_argument("--suite", type=Path, required=True)
+    p.add_argument("--published", action="store_true", help="include third-party answers shipped with the suite (comparison only)")
     p.add_argument("--run", action="append", help="LABEL=PATH to a predictions JSONL (repeatable)")
     p.add_argument("--common", action="store_true", help="restrict to pairs answered by every run")
     p.add_argument("--json", type=Path, help="also write the full report as JSON")

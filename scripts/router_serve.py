@@ -2,9 +2,9 @@
 
 The fast tier (deskmind-brain 0.8B, ~1–2 s per desktop decision on a Mac) answers every request. Its answer is used only
 when it is confident and the step is not one that is costly to get wrong; otherwise the same request goes to the
-escalation tier and that answer is returned. The escalation tier is any server speaking the same API: a local 4B
-(slower), or a remote API such as TypeSafe's Jev (fast, but the request text leaves the machine) via
---strong/--strong-key-env.
+escalation tier and that answer is returned. The escalation tier is any /v1/systemone server: a local 4B
+(e.g. http://127.0.0.1:8793), or a remote one (the request text then leaves the machine) via
+--strong/--strong-key-env/--strong-model.
 
 Agent requests (they carry an `operation` question):
   escalate if the operation is DONE / BLOCKED, a chord outside SAFE_KEYS, or a CLICK on the undo button -- ending a task, giving up and
@@ -43,9 +43,9 @@ def call(url: str, body: dict, key: str | None, model: str | None, timeout: floa
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--fast", required=True, help="base URL of the fast tier (deskmind-brain 0.8B)")
-    ap.add_argument("--strong", required=True, help="base URL of the escalation tier (local 4B, or https://... for Jev)")
+    ap.add_argument("--strong", required=True, help="base URL of the escalation tier: any /v1/systemone server, e.g. http://127.0.0.1:8793 (local 4B)")
     ap.add_argument("--strong-key-env", help="env var holding the escalation tier's API key (e.g. SYSTEMONE_API_KEY)")
-    ap.add_argument("--strong-model", help="model name to send to the escalation tier (e.g. jev-latest)")
+    ap.add_argument("--strong-model", help="model name to send to the escalation tier (default: pass the client's model through)")
     ap.add_argument("--threshold", type=float, default=0.94)
     ap.add_argument("--judge-threshold", type=float, default=0.8)
     ap.add_argument("--port", type=int, default=8796)

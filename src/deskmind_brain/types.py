@@ -1,4 +1,4 @@
-"""Wire types compatible with TypeSafe's `POST /v1/systemone`.
+"""Wire types for `POST /v1/systemone` (wire-compatible with /v1/systemone).
 
 Internally every answer is a probability distribution over a question's option keys:
   choice -> criteria keys, score -> "0".."K-1", noul -> "false", "true".
@@ -44,7 +44,7 @@ class Question(BaseModel):
 
 class SystemOneRequest(BaseModel):
     state: Any
-    model: str = "jev-latest"
+    model: str = "deskmind-brain-local"
     questions: dict[str, Question]
 
 
@@ -58,7 +58,7 @@ def normalize(dist: dict[str, float], options: list[str]) -> Distribution:
 
 
 def choice_confidence(dist: Distribution) -> float:
-    """(K * p_max - 1) / (K - 1). Matches every published Opus/Sol answer on evals.typesafe.ai exactly."""
+    """(K * p_max - 1) / (K - 1). Matches every published Opus/Sol answer in the public eval suite exactly."""
     k = len(dist)
     if k <= 1:
         return 1.0
@@ -70,7 +70,7 @@ def score_value(dist: Distribution) -> float:
 
 
 def score_confidence(dist: Distribution) -> float:
-    """1 - 2 * E|level - score| / (K - 1). Approximates TypeSafe's (unpublished) Score confidence."""
+    """1 - 2 * E|level - score| / (K - 1). Approximates the (unpublished) /v1/systemone score confidence."""
     k = len(dist)
     if k <= 1:
         return 1.0
@@ -80,7 +80,7 @@ def score_confidence(dist: Distribution) -> float:
 
 
 def to_answer(question: Question, dist: Distribution) -> dict[str, Any]:
-    """Distribution -> TypeSafe answer object."""
+    """Distribution -> /v1/systemone answer object."""
     dist = normalize(dist, question.options())
     if question.type == "noul":
         return {"type": "noul", "noul": dist["true"]}
@@ -101,7 +101,7 @@ def to_answer(question: Question, dist: Distribution) -> dict[str, Any]:
 
 
 def from_answer(question: Question, answer: dict[str, Any]) -> Distribution:
-    """TypeSafe answer object -> distribution over the question's options."""
+    """/v1/systemone answer object -> distribution over the question's options."""
     options = question.options()
     if question.type == "noul":
         p = float(answer["noul"])

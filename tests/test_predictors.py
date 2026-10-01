@@ -39,10 +39,10 @@ def server():
 def test_systemone_predictor_wire_format(server):
     _Handler.seen.clear()
     item = make_item()
-    pred = SystemOneAPIPredictor(base_url=server, model="jev-latest", api_key="k").predict(item)
+    pred = SystemOneAPIPredictor(base_url=server, model="brain-4b", api_key="k").predict(item)
     path, auth, body = _Handler.seen[0]
     assert path == "/v1/systemone" and auth == "Bearer k"
-    assert body["state"] == item.state and body["model"] == "jev-latest"
+    assert body["state"] == item.state and body["model"] == "brain-4b"
     assert body["questions"]["team"]["criteria"] == {"billing": "", "technical": "", "sales": ""}
     assert "criteria" not in body["questions"]["urgent"]
     assert pred.answers == {"urgent": {"type": "noul", "noul": 0.7}}

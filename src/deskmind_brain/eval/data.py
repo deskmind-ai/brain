@@ -2,7 +2,8 @@
 
 A suite is a directory:
   items.jsonl              one EvalItem per line (one System One request + reference distributions)
-  published/<model>.jsonl  optional Prediction files shipped with the source (e.g. Jev's own answers)
+  published/<model>.jsonl  optional Prediction files shipped with the source (third-party answers, scored for comparison only;
+                           never used as training labels)
 
 Predictions are also JSONL, one Prediction per item, so runs can be resumed and re-scored.
 """
@@ -56,7 +57,7 @@ class EvalItem:
 @dataclass
 class Prediction:
     item_id: str
-    answers: dict[str, dict[str, Any]]  # qid -> TypeSafe answer object
+    answers: dict[str, dict[str, Any]]  # qid -> /v1/systemone answer object
     latency_s: float | None = None
     cost_usd: float | None = None
     usage: dict[str, int] | None = None

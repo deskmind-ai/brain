@@ -32,8 +32,6 @@ All numbers are our own runs. The bench suite, graders and harness commit for ea
   latency; ours is local inference on an M4 Pro.
 - **One run per system was not scored:** the accessibility tree came back incomplete at the first step of the same
   task (an environment failure). A rerun of that task went 3/3 for both.
-- **Where Jev loses runs:** it declares a text edit done before it is saved (2 of 3 runs), and it loops on the
-  web-extraction task, which neither system solves.
 - **Ambiguous goals:** when the goal matches more than one record, the model asks first, then writes the full row,
   saves and finishes.
 - **Remaining failure:** the web-extraction task; the model types rows into the save dialog's file-name field.
@@ -46,7 +44,7 @@ column. The board's headline JevBench Score (0–100; Jev 1.13: 63.3) blends in 
 speed and cost, and its tier columns cover more items than the public repository holds, so our tier counts are not
 comparable with the board's tier columns.
 
-Run locally with the official `jevbench.cli` and the typesafe adapter against a local server:
+Run locally with the official `jevbench.cli` (its /v1/systemone adapter) against a local server:
 
 | | easy (48) | original (72) | hard (111) | public (231) |
 |---|---|---|---|---|

@@ -1,4 +1,4 @@
-"""A local `POST /v1/systemone` server, wire-compatible with TypeSafe's API, backed by any deskmind-brain predictor.
+"""A local `POST /v1/systemone` server (wire-compatible with /v1/systemone), backed by any deskmind-brain predictor.
 
     uv run --extra mlx deskmind-brain-serve --predictor mlx:models/brain-4b --port 8793
     uv run --extra mlx deskmind-brain-serve --predictor mlx:models/brain-0.8b --escalate-to mlx:models/brain-4b --two-stage
@@ -6,8 +6,8 @@
 With --escalate-to, one process serves both tiers: the fast model answers every request, and steps the routing rules
 send up (see deskmind_brain.router) are answered by the strong model instead. The reply carries a `routing` record.
 
-Requests are served one at a time (MLX is not thread-safe, and the Mac is compute-bound anyway). Clients that
-hardcode https://api.typesafe.ai only need their base URL pointed here; the Authorization header is ignored.
+Requests are served one at a time (MLX is not thread-safe, and the Mac is compute-bound anyway). Existing
+/v1/systemone clients only need their base URL pointed here; the Authorization header is ignored.
 """
 
 from __future__ import annotations

@@ -5,10 +5,10 @@ A case runs a policy graph; every graph node that ran is one System One request 
 several questions). For each node we get:
   - reference answers: per-question label sets from GPT-6 Astra and Claude Fable 5.1 (high thinking),
     either full probabilities or just a hard value; TypeSafe scores models against their mean.
-  - published answers from Opus 5, GPT-5.6 Sol and TypeSafe's own model (Jev).
+  - published answers from the models the site compares (Opus 5, GPT-5.6 Sol and the site's own model).
 
-One EvalItem = one (case, node). Published answers become Prediction files so they can be scored with
-the same code as our own models.
+One EvalItem = one (case, node). Published answers become Prediction files under published/ so they can be scored
+with the same code as our own models. They are for evaluation comparison only: label_teacher refuses them as labels.
 """
 
 from __future__ import annotations
