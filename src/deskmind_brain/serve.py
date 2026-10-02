@@ -7,7 +7,8 @@ With --escalate-to, one process serves both tiers: the fast model answers every 
 send up (see deskmind_brain.router) are answered by the strong model instead. The reply carries a `routing` record.
 
 Requests are served one at a time (MLX is not thread-safe, and the Mac is compute-bound anyway). Existing
-/v1/systemone clients only need their base URL pointed here; the Authorization header is ignored.
+/v1/systemone clients only need their base URL pointed here. When DESKMIND_BRAIN_TOKEN is set and non-empty, every request
+must carry `Authorization: Bearer <token>` (otherwise 401); when it is unset, the Authorization header is ignored.
 """
 
 from __future__ import annotations
@@ -15,7 +16,9 @@ from __future__ import annotations
 import argparse
 import collections
 import hashlib
+import hmac
 import json
+import os
 import threading
 import time
 import uuid
@@ -117,8 +120,20 @@ class Server:
         return ask
 
 
-def make_handler(server: Server):
+def make_handler(server: Server, token: str | None = None):
+    """With a non-empty `token`, every request must send `Authorization: Bearer <token>`; others get 401. The Mac app
+    sets one per install, so a process that merely listens on the expected port cannot pose as its model server."""
+    expected = f"Bearer {token}".encode() if token else None
+
     class Handler(BaseHTTPRequestHandler):
+        def _authorized(self) -> bool:
+            if expected is None:
+                return True
+            if hmac.compare_digest(self.headers.get("Authorization", "").encode(), expected):
+                return True
+            self._send(401, {"error": "unauthorized"})
+            return False
+
         def _send(self, status: int, payload: dict) -> None:
             data = json.dumps(payload, ensure_ascii=False).encode()
             self.send_response(status)
@@ -128,6 +143,8 @@ def make_handler(server: Server):
             self.wfile.write(data)
 
         def do_GET(self) -> None:  # noqa: N802 — http.server naming
+            if not self._authorized():
+                return
             if self.path.rstrip("/") == "/v1/models":
                 entry = {"id": server.model_name, "object": "model"}
                 if server.strong is not None:
@@ -137,6 +154,8 @@ def make_handler(server: Server):
                 self._send(404, {"error": {"message": "not found"}})
 
         def do_POST(self) -> None:  # noqa: N802
+            if not self._authorized():
+                return
             if self.path.rstrip("/") != "/v1/systemone":
                 self._send(404, {"error": {"message": "not found"}})
                 return
@@ -147,6 +166,12 @@ def make_handler(server: Server):
                 self._send(400, {"error": {"message": str(e)[:500]}})
             except Exception as e:  # noqa: BLE001 — report instead of dropping the connection
                 self._send(500, {"error": {"message": f"{type(e).__name__}: {e}"[:500]}})
+
+        def do_PUT(self) -> None:  # noqa: N802
+            if self._authorized():
+                self._send(404, {"error": {"message": "not found"}})
+
+        do_DELETE = do_PATCH = do_PUT
 
         def log_message(self, fmt: str, *args) -> None:
             print(f"{self.address_string()} {fmt % args}", flush=True)
@@ -195,7 +220,7 @@ def main() -> None:
         if server.strong is not None:
             # a DONE the strong tier confirms reuses the fast tier's heads (deskmind_brain.router.route): no head scoring
             getattr(server.strong, "inner", server.strong).terminal_heads = False
-    httpd = ThreadingHTTPServer((args.host, args.port), make_handler(server))
+    httpd = ThreadingHTTPServer((args.host, args.port), make_handler(server, os.environ.get("DESKMIND_BRAIN_TOKEN") or None))
     print(f"serving {args.predictor} on http://{args.host}:{args.port}/v1/systemone", flush=True)
     httpd.serve_forever()
 
