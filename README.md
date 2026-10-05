@@ -87,6 +87,8 @@ uv run deskmind-brain-serve --predictor mlx:models/brain-4b --port 8793 --two-st
 curl -s localhost:8793/v1/systemone -H 'Content-Type: application/json' -d @examples/request.json
 ```
 
+Or run the standard-library [Python client](examples/client.py): `uv run python examples/client.py` (use `--url` for another server, and `--allow-remote` to explicitly permit a non-local one).
+
 `examples/request.json` is a real step from a sandbox Finder task: the page state plus the questions for the operation
 and its targets.
 
