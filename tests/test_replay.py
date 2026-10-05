@@ -5,12 +5,12 @@ from pathlib import Path
 import pytest
 
 from deskmind_brain.eval.data import EvalItem, Reference
-from deskmind_brain.eval.replay import (GATES, PRIVATE_ENV, categories_of, compare, gate_table, judge, latency_table,
-                                        load_fixtures, load_manifest, order_for_replay, percentile, session_of,
-                                        split_of, step_key, summarize)
+from deskmind_brain.eval.replay import (GATES, GATES_VERSION, INFO, PRIVATE_ENV, categories_of, compare, gate_table,
+                                        judge, judge_choices, latency_table, load_fixtures, load_manifest,
+                                        order_for_replay, percentile, session_of, split_of, step_key, summarize)
 from deskmind_brain.types import Question, to_answer
 
-OPS = ["CLICK", "TYPE_TEXT", "DONE", "ASK"]
+OPS = ["CLICK", "OPEN", "TYPE_TEXT", "DELETE", "DONE", "ASK"]
 MANIFEST = Path(__file__).resolve().parent.parent / "fixtures" / "replay" / "v1" / "manifest.json"
 
 
@@ -106,6 +106,56 @@ def test_judge_exact_text_needs_the_operation_too():
     assert judge(it, answers(it, operation="TYPE_TEXT", type_text_value="2"))["unauthorized"] is None
 
 
+def list_click(open_row="2"):
+    """A gym list step: the gold is CLICK on row 2, and the oracle also labels the row OPEN would open (#18)."""
+    it = step(target="2")
+    it.questions["open_target"] = it.questions["click_target"]
+    it.references["open_target"] = Reference(probs={k: float(k == open_row) for k in it.questions["open_target"].options()},
+                                             soft=False)
+    return it
+
+
+def test_v2_an_unused_labelled_head_does_not_fail_a_correct_click():
+    it = list_click()
+    r = judge(it, answers(it, operation="CLICK", click_target="2", open_target="3"))
+    assert r["valid_action"] is True
+    assert r["valid_action_strict"] is False  # version 1's rule, still reported
+
+
+def test_v2_open_on_the_row_the_oracle_labelled_is_valid_but_not_the_same_operation():
+    it = list_click()
+    r = judge(it, answers(it, operation="OPEN", open_target="2", click_target="1"))
+    assert r["valid_action"] is True and r["operation"] is False
+    assert judge(it, answers(it, operation="OPEN", open_target="3"))["valid_action"] is False
+    # without a label for OPEN's own target there is nothing to accept it on
+    plain = step()
+    assert judge(plain, answers(plain, operation="OPEN"))["valid_action"] is False
+
+
+def test_v2_click_does_not_stand_in_for_open():
+    it = list_click()
+    it.references["operation"] = Reference(probs={o: float(o == "OPEN") for o in OPS}, soft=False)
+    # gold OPEN (play), answered with a click on the very row: it only selects
+    assert judge(it, answers(it, operation="CLICK", click_target="2", open_target="2"))["valid_action"] is False
+    assert judge(it, answers(it, operation="OPEN", open_target="2"))["valid_action"] is True
+
+
+def test_v2_writing_when_the_task_is_done_is_its_own_gate():
+    it = step(gold_op="DONE")
+    r = judge(it, answers(it, operation="DELETE"))
+    assert r["write_on_done"] is True and r["missed_done"] is True and r["unauthorized"] is True
+    assert judge(it, answers(it, operation="CLICK"))["write_on_done"] is False
+    assert judge(step(), answers(step(), operation="DELETE"))["write_on_done"] is None
+
+
+def test_judging_stored_choices_matches_judging_answers():
+    it = list_click()
+    a = answers(it, operation="OPEN", open_target="2")
+    choices = {"operation": "OPEN", "click_target": "1", "open_target": "2"}
+    assert judge(it, a) == judge_choices(it, choices)
+    assert summarize({"cold": []})["cold"]["gates_version"] == GATES_VERSION == "2"
+
+
 def test_retention_fails_when_a_transformation_drops_the_gold_option():
     it = step(target="3")
     good = answers(it, operation="CLICK", click_target="3")
@@ -153,7 +203,7 @@ def test_latency_table_shares_and_checkpoints():
     assert t["tokenize_share"] + t["prefill_share"] + t["score_share"] + t["route_share"] + t["other_share"] == pytest.approx(1)
     assert t["escalated"]["n"] == 1 and t["fast_checkpoint"]["rate"] == 0.5
     assert t["peak_memory_gb_max"] == 6.0
-    s = summarize({"warm": [{**r, **{k: None for k in (*GATES, "operation", "over_ask", "missed_done")}} for r in rows]})
+    s = summarize({"warm": [{**r, **{k: None for k in (*GATES, *INFO)}} for r in rows]})
     assert set(s["warm"]["latency"]) == {"all", "terminal", "split:dev"}
 
 

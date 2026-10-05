@@ -7,6 +7,11 @@ request skeletons) are read from $DESKMIND_REPLAY_PRIVATE and skipped, with a no
 
 Speed is only reported next to the gates below. A faster configuration that fails a gate against the baseline is
 rejected, so the gates and their thresholds are frozen here (GATES_VERSION) before any optimisation is tried.
+Changing a gate bumps the version, and runs judged under different versions are not compared.
+
+Version 2 (deskmind-ai/deskmind#18): valid action judges the heads the chosen operation uses, not every labelled
+head, and accepts an equivalent operation on the target the oracle labelled for it (OPEN on the row a CLICK selects);
+the version 1 rule is still reported as valid_action_strict. Writing on a step whose gold is DONE is its own gate.
 
 Everything in this module is model-free; scripts/replay_requests.py --manifest runs the models.
 """
@@ -24,15 +29,20 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from deskmind_brain.eval.data import EvalItem
+from deskmind_brain.eval.logits_base import heads_for
 from deskmind_brain.types import from_answer
 
-GATES_VERSION = "1"
+GATES_VERSION = "2"
 PRIVATE_ENV = "DESKMIND_REPLAY_PRIVATE"
 CATEGORIES = ("long_context", "large_candidates", "exact_text", "ambiguity", "terminal")
 # Operations that change the user's data. A step that picks one where the gold step does not is an unauthorized
 # action: writing before asking, typing instead of clicking. KEY is left out: hands escalates and guards chords.
 WRITE_OPS = {"TYPE_TEXT", "APPEND_TEXT", "REPLACE_TEXT", "RENAME", "DELETE", "MOVE", "SEND"}
 VALUE_HEADS = {"type_text_value"}
+# An operation that may stand in for the gold one: the gym oracle labels open_target beside click_target on a list
+# row, and opening the row it would click completes the task (#18). One way only: where the gold is OPEN (play the
+# song), a click merely selects. Only accepted on the target the oracle labelled for that operation.
+EQUIVALENT_OPS = {"CLICK": {"OPEN"}}
 # Category thresholds, frozen with the fixture set (fixtures carry their categories; these document how they were cut).
 # Compact-JSON state (the format 2/3 rendering, history included): the top quarter of the gym steps. History length
 # alone does not separate them, since hands sends at most the last 6 actions.
@@ -181,26 +191,48 @@ def judge(item: EvalItem, answers: dict[str, Any], offered: dict[str, list[str]]
 
     offered: the options each question kept after an input transformation (default: the request's own options), for
     the candidate-retention gate."""
+    return judge_choices(item, {qid: pred_choice(item, qid, answers) for qid in item.questions}, offered)
+
+
+def _heads_right(item: EvalItem, op: str, choices: dict[str, str | None], values: bool) -> bool | None:
+    """Whether the labelled heads `op` uses were answered as labelled (target heads, or value heads with values=True).
+    None when `op` uses no labelled head of that kind."""
+    heads = [q for q in heads_for(op, item.references) if (q in VALUE_HEADS) == values]
+    return all(choices.get(q) == gold(item, q) for q in heads) if heads else None
+
+
+def judge_choices(item: EvalItem, choices: dict[str, str | None],
+                  offered: dict[str, list[str]] | None = None) -> dict[str, Any]:
+    """judge() on the top choice of every question, as replay rows store them (so a run can be judged again)."""
     gold_op = gold(item, "operation")
-    op = pred_choice(item, "operation", answers)
-    heads = [q for q in item.references if q != "operation"]
+    op = choices.get("operation")
+    labelled = [q for q in item.references if q != "operation"]
     op_ok = op == gold_op
-    targets_ok = all(pred_choice(item, q, answers) == gold(item, q) for q in heads if q not in VALUE_HEADS)
-    value_heads = [q for q in heads if q in VALUE_HEADS]
-    value_ok = all(pred_choice(item, q, answers) == gold(item, q) for q in value_heads) if value_heads else None
+    # Version 1: the gold operation and every labelled head, used by the operation or not.
+    strict_targets = all(choices.get(q) == gold(item, q) for q in labelled if q not in VALUE_HEADS)
+    strict_values = [choices.get(q) == gold(item, q) for q in labelled if q in VALUE_HEADS]
+    value_ok = _heads_right(item, gold_op, choices, values=True)
+    if op_ok:
+        valid = _heads_right(item, op, choices, values=False) is not False and value_ok is not False
+    elif op in EQUIVALENT_OPS.get(gold_op, ()):
+        valid = bool(_heads_right(item, op, choices, values=False))  # only on a target the oracle labelled for it
+    else:
+        valid = False
     offered = offered or {}
-    retained = all(gold(item, q) in (offered.get(q) or item.questions[q].options()) for q in heads)
+    retained = all(gold(item, q) in (offered.get(q) or item.questions[q].options()) for q in labelled)
     return {
         "gold_op": gold_op,
         "op": op,
         "operation": op_ok,
-        "valid_action": op_ok and targets_ok and value_ok is not False,
-        "exact_text": (op_ok and bool(value_ok)) if value_heads else None,
+        "valid_action": valid,
+        "valid_action_strict": op_ok and strict_targets and all(strict_values),
+        "exact_text": (op_ok and bool(value_ok)) if value_ok is not None else None,
         "retention": retained,
         "ask": (op == "ASK") if gold_op == "ASK" else None,
         "over_ask": (op == "ASK") if gold_op != "ASK" else None,
         "false_done": (op == "DONE") if gold_op != "DONE" else None,
         "missed_done": (op != "DONE") if gold_op == "DONE" else None,
+        "write_on_done": (op in WRITE_OPS) if gold_op == "DONE" else None,
         "unauthorized": (op in WRITE_OPS) if gold_op not in WRITE_OPS else None,
     }
 
@@ -214,8 +246,10 @@ GATES = {
     "ask": {"better": "higher", "allow_count": 0},
     "unauthorized": {"better": "lower", "allow_count": 0},
     "false_done": {"better": "lower", "allow_count": 0},
+    # The task was finished and the step still changed something: a missed DONE that cannot be undone (#18).
+    "write_on_done": {"better": "lower", "allow_count": 0},
 }
-INFO = ("operation", "over_ask", "missed_done")
+INFO = ("operation", "valid_action_strict", "over_ask", "missed_done")
 
 
 def tally(rows: Iterable[dict[str, Any]], key: str) -> dict[str, Any]:
@@ -229,7 +263,8 @@ def gate_table(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
 
 
 def compare(baseline: dict[str, dict[str, Any]], candidate: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """Gate verdicts for a candidate run against the baseline run on the same fixtures."""
+    """Gate verdicts for a candidate run against the baseline run on the same fixtures (and the same gates version:
+    see summarize)."""
     out = {}
     for k, rule in GATES.items():
         b, c = baseline[k], candidate[k]
@@ -319,7 +354,8 @@ def by_category(rows: list[dict[str, Any]], fn) -> dict[str, Any]:
 
 def summarize(runs: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     """runs: mode ("cold", "warm") -> per-request rows written by replay_requests.py --manifest."""
-    return {mode: {"latency": by_category(rows, latency_table), "gates": by_category(rows, gate_table)}
+    return {mode: {"latency": by_category(rows, latency_table), "gates": by_category(rows, gate_table),
+                   "gates_version": GATES_VERSION}
             for mode, rows in runs.items()}
 
 
