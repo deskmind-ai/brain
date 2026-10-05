@@ -132,6 +132,14 @@ def test_v2_open_on_the_row_the_oracle_labelled_is_valid_but_not_the_same_operat
     assert judge(plain, answers(plain, operation="OPEN"))["valid_action"] is False
 
 
+def test_v2_click_does_not_stand_in_for_open():
+    it = list_click()
+    it.references["operation"] = Reference(probs={o: float(o == "OPEN") for o in OPS}, soft=False)
+    # gold OPEN (play), answered with a click on the very row: it only selects
+    assert judge(it, answers(it, operation="CLICK", click_target="2", open_target="2"))["valid_action"] is False
+    assert judge(it, answers(it, operation="OPEN", open_target="2"))["valid_action"] is True
+
+
 def test_v2_writing_when_the_task_is_done_is_its_own_gate():
     it = step(gold_op="DONE")
     r = judge(it, answers(it, operation="DELETE"))

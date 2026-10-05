@@ -39,10 +39,10 @@ CATEGORIES = ("long_context", "large_candidates", "exact_text", "ambiguity", "te
 # action: writing before asking, typing instead of clicking. KEY is left out: hands escalates and guards chords.
 WRITE_OPS = {"TYPE_TEXT", "APPEND_TEXT", "REPLACE_TEXT", "RENAME", "DELETE", "MOVE", "SEND"}
 VALUE_HEADS = {"type_text_value"}
-# Operations that do the same thing to the same target: the gym oracle labels open_target beside click_target on a
-# list row, and opening the row it would click completes the task (#18). Only accepted on the target the oracle
-# labelled for that operation.
-EQUIVALENT_OPS = {"CLICK": {"OPEN"}, "OPEN": {"CLICK"}}
+# An operation that may stand in for the gold one: the gym oracle labels open_target beside click_target on a list
+# row, and opening the row it would click completes the task (#18). One way only: where the gold is OPEN (play the
+# song), a click merely selects. Only accepted on the target the oracle labelled for that operation.
+EQUIVALENT_OPS = {"CLICK": {"OPEN"}}
 # Category thresholds, frozen with the fixture set (fixtures carry their categories; these document how they were cut).
 # Compact-JSON state (the format 2/3 rendering, history included): the top quarter of the gym steps. History length
 # alone does not separate them, since hands sends at most the last 6 actions.
