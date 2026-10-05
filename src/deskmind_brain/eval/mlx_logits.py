@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import time
 from collections import OrderedDict
 from pathlib import Path
 
@@ -100,11 +101,24 @@ class MLXLogitsPredictor(LogitsPredictorBase):
         """Prefill the shared prefix of a request. With format 3, the part up to the state (system prompt + goal +
         rules) is kept as a checkpoint across requests, so later steps of the same task only prefill their state."""
         key = tuple(prefix)
+        stats = self.stats
         if key == self._prefix_key:
+            if stats is not None:
+                stats["prefix_reused"] += 1
             return self._prefix_cache
         mx = self.mx
+        start = time.perf_counter()
         head = tuple(prefix[:head_len]) if 0 < head_len < len(prefix) else None
-        if head is not None and head in self._checkpoints:
+        hit = head is not None and head in self._checkpoints
+        if stats is not None:
+            stats["prefills"] += 1
+            stats["prefix_tokens"] = max(stats["prefix_tokens"], len(prefix))
+            stats["prefilled_tokens"] += len(prefix) - (len(head) if hit else 0)
+            if head is not None:
+                stats["head_tokens"] = max(stats["head_tokens"], len(head))
+                if stats["checkpoint"] is None:
+                    stats["checkpoint"] = "hit" if hit else "miss"
+        if hit:
             self._checkpoints.move_to_end(head)
             cache = self._copy_cache(self._checkpoints[head])
             rest = prefix[head_len:]
@@ -121,6 +135,8 @@ class MLXLogitsPredictor(LogitsPredictorBase):
         self.text(mx.array(rest)[None], cache=cache)
         mx.eval([c.state for c in cache])
         self._prefix_key, self._prefix_cache = key, cache
+        if stats is not None:
+            stats["prefill_s"] += time.perf_counter() - start
         return cache
 
     # ------------------------------------------------------------------ branches
@@ -188,6 +204,7 @@ class MLXLogitsPredictor(LogitsPredictorBase):
             prefix_len = self._prefix_hint  # two-stage: pin the prefix so both stages share one prefill
         head_len = self._stable_head_len(context, prompts[0].text, sequences[0])
         cache = self._prefill(sequences[0][:prefix_len], head_len if head_len < prefix_len else 0)
+        scoring = time.perf_counter()
         n_heads = self.text.layers[self.lm.args.full_attention_interval - 1].self_attn.num_attention_heads
 
         # Group by (label count, suffix length) so chunks share a label set and pad little.
@@ -212,4 +229,9 @@ class MLXLogitsPredictor(LogitsPredictorBase):
             for i, row in zip(chunk, probs):
                 results[i] = dict(zip(prompts[i].options, row))
             start += len(chunk)
+        if self.stats is not None:  # .tolist() above has synchronized, so this is the branches' compute
+            self.stats["score_s"] += time.perf_counter() - scoring
+            self.stats["score_calls"] += 1
+            self.stats["branches"] += len(prompts)
+            self.stats["prompt_tokens"] = max(self.stats["prompt_tokens"], max(len(s) for s in sequences))
         return results  # type: ignore[return-value]

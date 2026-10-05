@@ -243,6 +243,8 @@ class LogitsPredictorBase:
     two_stage = False
     terminal_heads = True  # two-stage: score every head when the operation is DONE/BLOCKED/ASK (see _predict_two_stage)
     _prefix_hint: int | None = None
+    # Where the last predict() spent its time (see new_stats); read by scripts/replay_requests.py --manifest.
+    stats: dict[str, Any] | None = None
 
     def _init_labels(self, model_id: str, model_dir: str | None = None) -> None:
         self.round_size = ROUND_SIZE
@@ -260,6 +262,24 @@ class LogitsPredictorBase:
                 raise ValueError(f"label {label!r} is not a single token for {model_id}")
             self._label_ids[label] = ids[0]
 
+    @staticmethod
+    def new_stats() -> dict[str, Any]:
+        """Counters for one predict(). Times are seconds; a backend that does not fill one leaves it 0.
+
+        tokenize_s: chat template + tokenizer; prefill_s: the shared prefix (state + shared instructions), including
+        restoring a checkpoint; score_s: the question branches. checkpoint: the format-3 head checkpoint of the first
+        prefill ("hit", "miss", or None when the prompt has no stable head)."""
+        return {"tokenize_s": 0.0, "prefill_s": 0.0, "score_s": 0.0, "total_s": 0.0, "prompt_tokens": 0,
+                "prefix_tokens": 0, "head_tokens": 0, "prefilled_tokens": 0, "prefills": 0, "prefix_reused": 0,
+                "checkpoint": None, "branches": 0, "score_calls": 0}
+
+    def _encode(self, text: str) -> list[int]:
+        start = time.perf_counter()
+        ids = self.tokenizer.encode(text, add_special_tokens=False)
+        if self.stats is not None:
+            self.stats["tokenize_s"] += time.perf_counter() - start
+        return ids
+
     def _prompt_text(self, context: str, block: str) -> str:
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -268,7 +288,11 @@ class LogitsPredictorBase:
         return self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, enable_thinking=False)
 
     def _prompt_ids(self, context: str, block: str) -> list[int]:
-        return self.tokenizer.encode(self._prompt_text(context, block), add_special_tokens=False)
+        start = time.perf_counter()
+        text = self._prompt_text(context, block)
+        if self.stats is not None:
+            self.stats["tokenize_s"] += time.perf_counter() - start
+        return self._encode(text)
 
     def _stable_head_len(self, context: str, block: str, ids: list[int]) -> int:
         """Format 3: token length of the prompt up to the state (system prompt + shared goal and rules), which stays
@@ -279,7 +303,7 @@ class LogitsPredictorBase:
         cut = text.find(STATE_TAG)
         if cut <= 0:
             return 0
-        head = self.tokenizer.encode(text[:cut], add_special_tokens=False)
+        head = self._encode(text[:cut])
         return len(head) if ids[: len(head)] == head else 0
 
     def _score(self, context: str, prompts: list[Prompt]) -> list[dict[str, float]]:
@@ -301,6 +325,7 @@ class LogitsPredictorBase:
 
     def predict(self, item: EvalItem) -> Prediction:
         start = time.perf_counter()
+        self.stats = self.new_stats()
         try:
             if self.two_stage and "operation" in item.questions:
                 dists = self._predict_two_stage(item)
@@ -309,7 +334,8 @@ class LogitsPredictorBase:
         finally:
             self._release_memory()
         answers = {qid: to_answer(q, normalize(dists[qid], q.options())) for qid, q in item.questions.items()}
-        return Prediction(item_id=item.id, answers=answers, latency_s=time.perf_counter() - start, cost_usd=0.0)
+        self.stats["total_s"] = time.perf_counter() - start
+        return Prediction(item_id=item.id, answers=answers, latency_s=self.stats["total_s"], cost_usd=0.0)
 
     def _predict_two_stage(self, item: EvalItem) -> dict[str, dict[str, float]]:
         # The context (state + instructions shared by *all* questions) is identical in both stages, and the prefix is
