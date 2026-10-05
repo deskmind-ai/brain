@@ -22,7 +22,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/deskmind-ai/brain"
 Repository = "https://github.com/deskmind-ai/brain"
-Issues = "https://github.com/deskmind-ai/brain/issues"
+Issues = "https://github.com/deskmind-ai/deskmind/issues"
 
 [project.scripts]
 deskmind-brain-eval = "deskmind_brain.eval.cli:main"
