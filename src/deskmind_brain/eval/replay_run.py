@@ -23,8 +23,8 @@ from pathlib import Path
 from typing import Any
 
 from deskmind_brain.eval.data import EvalItem
-from deskmind_brain.eval.replay import (compare, head_agreement, judge, load_fixtures, load_manifest, markdown,
-                                        max_options, order_for_replay, pred_choice, sha256_file, summarize)
+from deskmind_brain.eval.replay import (GATES_VERSION, compare, head_agreement, judge, load_fixtures, load_manifest,
+                                        markdown, max_options, order_for_replay, pred_choice, sha256_file, summarize)
 from deskmind_brain.router import heads_for
 
 
@@ -179,6 +179,10 @@ def run(manifest: str, fast: str, strong: str | None, threshold: float, modes: l
         summary["head_agreement_with_strong"] = {m: head_agreement(rows, ref) for m, rows in runs.items()}
     if baseline:
         base = json.loads(Path(baseline).read_text())["modes"]
+        stale = {m: v.get("gates_version", "1") for m, v in base.items() if v.get("gates_version", "1") != GATES_VERSION}
+        if stale:
+            raise SystemExit(f"{baseline} was judged with gates version {stale}, this run with {GATES_VERSION}: "
+                             "re-judge it first (scripts/rejudge_replay.py)")
         summary["gates_vs_baseline"] = {m: compare(base[m]["gates"]["all"], s["gates"]["all"])
                                         for m, s in summary["modes"].items() if m in base}
     (out_dir / "summary.json").write_text(json.dumps(summary, indent=1, ensure_ascii=False) + "\n")

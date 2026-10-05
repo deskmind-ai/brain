@@ -324,9 +324,9 @@
    "gates": {
     "all": {
      "valid_action": {
-      "n": 200,
+      "n": 235,
       "of": 322,
-      "rate": 0.6211180124223602
+      "rate": 0.7298136645962733
      },
      "exact_text": {
       "n": 27,
@@ -353,10 +353,20 @@
       "of": 243,
       "rate": 0.0411522633744856
      },
+     "write_on_done": {
+      "n": 4,
+      "of": 79,
+      "rate": 0.05063291139240506
+     },
      "operation": {
       "n": 243,
       "of": 322,
       "rate": 0.7546583850931677
+     },
+     "valid_action_strict": {
+      "n": 200,
+      "of": 322,
+      "rate": 0.6211180124223602
      },
      "over_ask": {
       "n": 1,
@@ -371,9 +381,9 @@
     },
     "long_context": {
      "valid_action": {
-      "n": 27,
+      "n": 53,
       "of": 70,
-      "rate": 0.38571428571428573
+      "rate": 0.7571428571428571
      },
      "exact_text": {
       "n": 0,
@@ -400,10 +410,20 @@
       "of": 55,
       "rate": 0.01818181818181818
      },
+     "write_on_done": {
+      "n": 0,
+      "of": 15,
+      "rate": 0.0
+     },
      "operation": {
       "n": 57,
       "of": 70,
       "rate": 0.8142857142857143
+     },
+     "valid_action_strict": {
+      "n": 27,
+      "of": 70,
+      "rate": 0.38571428571428573
      },
      "over_ask": {
       "n": 0,
@@ -418,9 +438,9 @@
     },
     "large_candidates": {
      "valid_action": {
-      "n": 3,
+      "n": 24,
       "of": 30,
-      "rate": 0.1
+      "rate": 0.8
      },
      "exact_text": {
       "n": 0,
@@ -447,10 +467,20 @@
       "of": 30,
       "rate": 0.0
      },
+     "write_on_done": {
+      "n": 0,
+      "of": 0,
+      "rate": null
+     },
      "operation": {
       "n": 26,
       "of": 30,
       "rate": 0.8666666666666667
+     },
+     "valid_action_strict": {
+      "n": 3,
+      "of": 30,
+      "rate": 0.1
      },
      "over_ask": {
       "n": 0,
@@ -494,10 +524,20 @@
       "of": 41,
       "rate": 0.024390243902439025
      },
+     "write_on_done": {
+      "n": 0,
+      "of": 0,
+      "rate": null
+     },
      "operation": {
       "n": 28,
       "of": 41,
       "rate": 0.6829268292682927
+     },
+     "valid_action_strict": {
+      "n": 27,
+      "of": 41,
+      "rate": 0.6585365853658537
      },
      "over_ask": {
       "n": 0,
@@ -541,7 +581,17 @@
       "of": 55,
       "rate": 0.0
      },
+     "write_on_done": {
+      "n": 0,
+      "of": 15,
+      "rate": 0.0
+     },
      "operation": {
+      "n": 70,
+      "of": 70,
+      "rate": 1.0
+     },
+     "valid_action_strict": {
       "n": 70,
       "of": 70,
       "rate": 1.0
@@ -588,10 +638,20 @@
       "of": 28,
       "rate": 0.21428571428571427
      },
+     "write_on_done": {
+      "n": 4,
+      "of": 79,
+      "rate": 0.05063291139240506
+     },
      "operation": {
       "n": 70,
       "of": 107,
       "rate": 0.6542056074766355
+     },
+     "valid_action_strict": {
+      "n": 69,
+      "of": 107,
+      "rate": 0.6448598130841121
      },
      "over_ask": {
       "n": 1,
@@ -606,9 +666,9 @@
     },
     "split:dev": {
      "valid_action": {
-      "n": 133,
+      "n": 145,
       "of": 198,
-      "rate": 0.6717171717171717
+      "rate": 0.7323232323232324
      },
      "exact_text": {
       "n": 26,
@@ -635,10 +695,20 @@
       "of": 152,
       "rate": 0.05921052631578947
      },
+     "write_on_done": {
+      "n": 2,
+      "of": 46,
+      "rate": 0.043478260869565216
+     },
      "operation": {
       "n": 148,
       "of": 198,
       "rate": 0.7474747474747475
+     },
+     "valid_action_strict": {
+      "n": 133,
+      "of": 198,
+      "rate": 0.6717171717171717
      },
      "over_ask": {
       "n": 1,
@@ -653,9 +723,9 @@
     },
     "split:holdout": {
      "valid_action": {
-      "n": 67,
+      "n": 90,
       "of": 124,
-      "rate": 0.5403225806451613
+      "rate": 0.7258064516129032
      },
      "exact_text": {
       "n": 1,
@@ -682,10 +752,20 @@
       "of": 91,
       "rate": 0.01098901098901099
      },
+     "write_on_done": {
+      "n": 2,
+      "of": 33,
+      "rate": 0.06060606060606061
+     },
      "operation": {
       "n": 95,
       "of": 124,
       "rate": 0.7661290322580645
+     },
+     "valid_action_strict": {
+      "n": 67,
+      "of": 124,
+      "rate": 0.5403225806451613
      },
      "over_ask": {
       "n": 0,
@@ -698,7 +778,8 @@
       "rate": 0.24242424242424243
      }
     }
-   }
+   },
+   "gates_version": "2"
   },
   "warm": {
    "latency": {
@@ -978,9 +1059,9 @@
    "gates": {
     "all": {
      "valid_action": {
-      "n": 200,
+      "n": 235,
       "of": 322,
-      "rate": 0.6211180124223602
+      "rate": 0.7298136645962733
      },
      "exact_text": {
       "n": 27,
@@ -1007,10 +1088,20 @@
       "of": 243,
       "rate": 0.0411522633744856
      },
+     "write_on_done": {
+      "n": 4,
+      "of": 79,
+      "rate": 0.05063291139240506
+     },
      "operation": {
       "n": 243,
       "of": 322,
       "rate": 0.7546583850931677
+     },
+     "valid_action_strict": {
+      "n": 200,
+      "of": 322,
+      "rate": 0.6211180124223602
      },
      "over_ask": {
       "n": 1,
@@ -1025,9 +1116,9 @@
     },
     "long_context": {
      "valid_action": {
-      "n": 27,
+      "n": 53,
       "of": 70,
-      "rate": 0.38571428571428573
+      "rate": 0.7571428571428571
      },
      "exact_text": {
       "n": 0,
@@ -1054,10 +1145,20 @@
       "of": 55,
       "rate": 0.01818181818181818
      },
+     "write_on_done": {
+      "n": 0,
+      "of": 15,
+      "rate": 0.0
+     },
      "operation": {
       "n": 57,
       "of": 70,
       "rate": 0.8142857142857143
+     },
+     "valid_action_strict": {
+      "n": 27,
+      "of": 70,
+      "rate": 0.38571428571428573
      },
      "over_ask": {
       "n": 0,
@@ -1072,9 +1173,9 @@
     },
     "large_candidates": {
      "valid_action": {
-      "n": 3,
+      "n": 24,
       "of": 30,
-      "rate": 0.1
+      "rate": 0.8
      },
      "exact_text": {
       "n": 0,
@@ -1101,10 +1202,20 @@
       "of": 30,
       "rate": 0.0
      },
+     "write_on_done": {
+      "n": 0,
+      "of": 0,
+      "rate": null
+     },
      "operation": {
       "n": 26,
       "of": 30,
       "rate": 0.8666666666666667
+     },
+     "valid_action_strict": {
+      "n": 3,
+      "of": 30,
+      "rate": 0.1
      },
      "over_ask": {
       "n": 0,
@@ -1148,10 +1259,20 @@
       "of": 41,
       "rate": 0.024390243902439025
      },
+     "write_on_done": {
+      "n": 0,
+      "of": 0,
+      "rate": null
+     },
      "operation": {
       "n": 28,
       "of": 41,
       "rate": 0.6829268292682927
+     },
+     "valid_action_strict": {
+      "n": 27,
+      "of": 41,
+      "rate": 0.6585365853658537
      },
      "over_ask": {
       "n": 0,
@@ -1195,7 +1316,17 @@
       "of": 55,
       "rate": 0.0
      },
+     "write_on_done": {
+      "n": 0,
+      "of": 15,
+      "rate": 0.0
+     },
      "operation": {
+      "n": 70,
+      "of": 70,
+      "rate": 1.0
+     },
+     "valid_action_strict": {
       "n": 70,
       "of": 70,
       "rate": 1.0
@@ -1242,10 +1373,20 @@
       "of": 28,
       "rate": 0.21428571428571427
      },
+     "write_on_done": {
+      "n": 4,
+      "of": 79,
+      "rate": 0.05063291139240506
+     },
      "operation": {
       "n": 70,
       "of": 107,
       "rate": 0.6542056074766355
+     },
+     "valid_action_strict": {
+      "n": 69,
+      "of": 107,
+      "rate": 0.6448598130841121
      },
      "over_ask": {
       "n": 1,
@@ -1260,9 +1401,9 @@
     },
     "split:dev": {
      "valid_action": {
-      "n": 133,
+      "n": 145,
       "of": 198,
-      "rate": 0.6717171717171717
+      "rate": 0.7323232323232324
      },
      "exact_text": {
       "n": 26,
@@ -1289,10 +1430,20 @@
       "of": 152,
       "rate": 0.05921052631578947
      },
+     "write_on_done": {
+      "n": 2,
+      "of": 46,
+      "rate": 0.043478260869565216
+     },
      "operation": {
       "n": 148,
       "of": 198,
       "rate": 0.7474747474747475
+     },
+     "valid_action_strict": {
+      "n": 133,
+      "of": 198,
+      "rate": 0.6717171717171717
      },
      "over_ask": {
       "n": 1,
@@ -1307,9 +1458,9 @@
     },
     "split:holdout": {
      "valid_action": {
-      "n": 67,
+      "n": 90,
       "of": 124,
-      "rate": 0.5403225806451613
+      "rate": 0.7258064516129032
      },
      "exact_text": {
       "n": 1,
@@ -1336,10 +1487,20 @@
       "of": 91,
       "rate": 0.01098901098901099
      },
+     "write_on_done": {
+      "n": 2,
+      "of": 33,
+      "rate": 0.06060606060606061
+     },
      "operation": {
       "n": 95,
       "of": 124,
       "rate": 0.7661290322580645
+     },
+     "valid_action_strict": {
+      "n": 67,
+      "of": 124,
+      "rate": 0.5403225806451613
      },
      "over_ask": {
       "n": 0,
@@ -1352,7 +1513,8 @@
       "rate": 0.24242424242424243
      }
     }
-   }
+   },
+   "gates_version": "2"
   }
  },
  "head_agreement_with_strong": {
@@ -1366,5 +1528,9 @@
    "operation": 1.0,
    "used_heads": 1.0
   }
+ },
+ "rejudged": {
+  "gates_version": "2",
+  "from_rows": "runs/replay/baseline-v1"
  }
 }

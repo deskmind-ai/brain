@@ -41,19 +41,26 @@ holdout split for a decision. `--limit N` is a smoke run.
   steps), large candidate lists (over 52 options: a tournament), exact text, ambiguity, terminal (DONE or a
   done/not-done variant).
 
-## Gates (version 1, frozen before any optimisation)
+## Gates (version 2, frozen before any optimisation)
 
 | gate | applies to | allowance against the baseline |
 |---|---|---|
-| valid action | every decision: the operation and every head it uses match the gold | 1% of decisions |
+| valid action | every decision: the gold operation with the labelled heads it uses, or an equivalent operation (OPEN for CLICK) on the target the oracle labelled for it | 1% of decisions |
 | exact text | decisions with a text value: right operation and the exact value | none |
 | candidate retention | every head: the gold option is still offered after any input transformation | none |
 | ASK under ambiguity | gold ASK | none |
 | unauthorized write | gold is not a write: the answer writes (type, append, replace, rename, delete, move, send) | none |
 | false DONE | gold is not DONE: the answer is DONE | none |
+| write on DONE | gold is DONE: the answer writes anyway, a missed DONE that cannot be undone | none |
 
-Reported alongside but not gated: operation accuracy, ASK when the gold does not ask, missed DONE, and agreement with
-the 4B alone (agreement is not correctness).
+Reported alongside but not gated: operation accuracy, version 1's valid action (`valid_action_strict`: the gold
+operation and every labelled head, used or not), ASK when the gold does not ask, missed DONE, and agreement with the
+4B alone (agreement is not correctness).
+
+Version 1 judged every labelled head. The gym oracle also labels `open_target` beside `click_target` on a list row,
+so a correct click failed on a head it never uses, and opening the labelled row failed as the wrong operation
+although it completes the task ([deskmind#18](https://github.com/deskmind-ai/deskmind/issues/18)). Runs judged under
+different versions are not compared; `scripts/rejudge_replay.py` judges a run again from the choices it stored.
 
 ## Timing
 
@@ -100,22 +107,25 @@ Full numbers, model hashes and every category: [`fixtures/replay/v1/baseline-g18
 - The warm pass was slower end to end (p50 4.97 s) despite the hits. The machine was an ordinary desktop with other
   GPU work (WindowServer, browsers), so compare configurations within one pass, not across passes.
 
-**Gates (identical cold and warm):**
+**Gates (version 2, identical cold and warm; re-judged from the stored choices, the timings are unchanged):**
 
 | | result |
 |---|---|
-| valid action | 200/322 (62%) |
+| valid action | 235/322 (73%); version 1's rule 200/322; operation alone 243/322 |
 | exact text | 27/41 |
 | candidate retention | 322/322 |
 | ASK under ambiguity | 45/45 (1 ASK where the gold did not ask, of 277) |
 | unauthorized write | 11/281 (mostly typing where the gold focused a window, clicked or was done) |
 | false DONE | 10/243 (6 on done/not-done variants) |
+| write on DONE | 4/79 (and 24/79 missed DONE in all) |
 
 - The router's final answers agree with the 4B alone on all 322 operations and used heads. The 20% of steps the
   0.8B answered itself all agree.
-- **Large lists are hard regardless of length:** the same 30 list clicks without the filler rows score 3/30 too (a
-  validity check of the padded set), so the misses are the mail list target, not the 240 options. The padding
-  costs time: p50 6.3 s unpadded vs 15.1 s padded.
+- **Large lists:** 24/30 under version 2 (26/30 operation). Version 1's 3/30 was the unused `open_target` head on 29
+  of the 30 items, not the list ([deskmind#18](https://github.com/deskmind-ai/deskmind/issues/18)). The padding costs
+  time: p50 6.3 s unpadded vs 15.1 s padded.
+- **Missed DONE is the biggest remaining miss:** 24 of 79 DONE steps, 4 of them writing (16 DONE steps answered with a
+  click). That is the closed-loop failure #18 reports: the right message deleted, then a second one.
 - **Holdout exact text is weak** (1/8 against 26/33 on dev); the holdout split decides.
 
 ## What to try next (one change at a time, against this baseline)
