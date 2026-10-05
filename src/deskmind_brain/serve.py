@@ -120,6 +120,16 @@ class Server:
         return ask
 
 
+def use_two_stage(server: Server) -> None:
+    """--two-stage, as the Mac app runs the server (also used by scripts/replay_requests.py --manifest)."""
+    for pred in (server.predictor, server.strong):
+        if pred is not None:
+            getattr(pred, "inner", pred).two_stage = True
+    if server.strong is not None:
+        # a DONE the strong tier confirms reuses the fast tier's heads (deskmind_brain.router.route): no head scoring
+        getattr(server.strong, "inner", server.strong).terminal_heads = False
+
+
 def make_handler(server: Server, token: str | None = None):
     """With a non-empty `token`, every request must send `Authorization: Bearer <token>`; others get 401. The Mac app
     sets one per install, so a process that merely listens on the expected port cannot pose as its model server."""
@@ -214,12 +224,7 @@ def main() -> None:
     server = Server(args.predictor, args.model_name, args.cache_size, args.escalate_to, args.threshold,
                     not args.no_keep_done_over_undo, args.routing_log)
     if args.two_stage:
-        for pred in (server.predictor, server.strong):
-            if pred is not None:
-                getattr(pred, "inner", pred).two_stage = True
-        if server.strong is not None:
-            # a DONE the strong tier confirms reuses the fast tier's heads (deskmind_brain.router.route): no head scoring
-            getattr(server.strong, "inner", server.strong).terminal_heads = False
+        use_two_stage(server)
     httpd = ThreadingHTTPServer((args.host, args.port), make_handler(server, os.environ.get("DESKMIND_BRAIN_TOKEN") or None))
     print(f"serving {args.predictor} on http://{args.host}:{args.port}/v1/systemone", flush=True)
     httpd.serve_forever()
