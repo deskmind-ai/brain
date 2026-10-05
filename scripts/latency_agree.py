@@ -2,6 +2,9 @@
 agreement of every answered head with the first server (the reference).
 
     python scripts/latency_agree.py ref=http://127.0.0.1:8793 q8=http://127.0.0.1:8794 --probes path/to/probes.jsonl
+
+--manifest takes the request bodies from the replay fixtures instead (deskmind_brain/eval/replay.py), in replay order.
+Agreement with a reference server is not correctness; scripts/replay_requests.py --manifest scores against the labels.
 """
 
 from __future__ import annotations
@@ -24,11 +27,22 @@ def ask(url: str, body: dict) -> tuple[dict, float]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("servers", nargs="+")
-    ap.add_argument("--probes", nargs="+", required=True)
+    ap.add_argument("--probes", nargs="+")
+    ap.add_argument("--manifest", help="replay fixtures instead of --probes")
     ap.add_argument("--limit", type=int, default=0)
     args = ap.parse_args()
     bodies = []
-    for p in args.probes:
+    if args.manifest:
+        from deskmind_brain.eval.replay import load_fixtures, load_manifest, order_for_replay
+
+        items, notes = load_fixtures(load_manifest(args.manifest))
+        for note in notes:
+            print(note)
+        bodies = [{"state": it.state, "questions": {q: v.model_dump(exclude_none=True) for q, v in it.questions.items()}}
+                  for it in order_for_replay(items)]
+    elif not args.probes:
+        ap.error("give --probes or --manifest")
+    for p in args.probes or []:
         for line in open(p):
             if line.strip():
                 r = json.loads(line)
