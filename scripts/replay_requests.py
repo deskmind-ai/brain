@@ -74,6 +74,8 @@ def main() -> None:
     ap.add_argument("--limit", type=int, help="first N fixtures in replay order (smoke runs)")
     ap.add_argument("--no-reference", action="store_true", help="skip the strong-tier-alone pass for head agreement")
     ap.add_argument("--label", default="baseline")
+    ap.add_argument("--baseline", help="summary.json of the baseline run: report each gate as pass/fail against it "
+                    "(fixtures/replay/v1/baseline-g18b.json is the release's)")
     ap.add_argument("--out", default="runs/replay/baseline")
     args = ap.parse_args()
     if not args.manifest:
@@ -89,7 +91,7 @@ def main() -> None:
         ap.error("--manifest needs --fast (and --strong for the router)")
     threshold = args.threshold if args.threshold is not None else default_threshold(args.fast, fallback=0.96)
     summary = run(args.manifest, args.fast, args.strong, threshold, args.modes, args.out, reference=not args.no_reference,
-                  split=args.split, limit=args.limit, label=args.label)
+                  split=args.split, limit=args.limit, label=args.label, baseline=args.baseline)
     print(json.dumps({m: s["latency"]["all"] | {"gates": {k: f"{v['n']}/{v['of']}" for k, v in s["gates"]["all"].items()}}
                       for m, s in summary["modes"].items()}, ensure_ascii=False, indent=1, default=str))
     print(f"report: {args.out}/report.md")
