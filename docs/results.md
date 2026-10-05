@@ -67,6 +67,8 @@ Run locally with the official `jevbench.cli` (its /v1/systemone adapter) against
 
 ## Speed on an M4 Pro (48 GB)
 
+- **Replay benchmark:** a reproducible, correctness-gated latency baseline over 322 labelled decisions, with stage
+  timings and checkpoint hits: [replay.md](replay.md). About half of request time is prefilling the screen state.
 - **Where the time goes:** prefill is compute-bound at about 850 tokens/s for the 4B. A desktop step is about 1.9k
   prompt tokens, so time scales with prompt length, not weight bytes.
 - **Quantization does not help:**

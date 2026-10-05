@@ -23,8 +23,8 @@ from pathlib import Path
 from typing import Any
 
 from deskmind_brain.eval.data import EvalItem
-from deskmind_brain.eval.replay import (judge, load_fixtures, load_manifest, markdown, max_options, order_for_replay,
-                                        pred_choice, summarize, head_agreement, sha256_file)
+from deskmind_brain.eval.replay import (compare, head_agreement, judge, load_fixtures, load_manifest, markdown,
+                                        max_options, order_for_replay, pred_choice, sha256_file, summarize)
 from deskmind_brain.router import heads_for
 
 
@@ -45,7 +45,7 @@ def _clear_checkpoints(server) -> None:
 
 def _model_info(spec: str) -> dict[str, Any]:
     path = Path(spec.split(":", 1)[-1])
-    info: dict[str, Any] = {"spec": spec}
+    info: dict[str, Any] = {"spec": spec.replace(str(Path.home()), "~")}  # reports get published: no user names
     fmt = path / "deskmind.json"
     if fmt.exists():
         info["deskmind.json"] = json.loads(fmt.read_text())
@@ -146,7 +146,9 @@ def reference_choices(pred, items: list[EvalItem], log=print) -> dict[str, dict[
 
 
 def run(manifest: str, fast: str, strong: str | None, threshold: float, modes: list[str], out: str,
-        reference: bool = True, split: str | None = None, limit: int | None = None, label: str = "baseline") -> dict:
+        reference: bool = True, split: str | None = None, limit: int | None = None, label: str = "baseline",
+        baseline: str | None = None) -> dict:
+    """baseline: a summary.json of an earlier run on the same fixtures; its gates decide keep or reject."""
     from deskmind_brain.serve import Server, use_two_stage
 
     manifest_path = Path(manifest)
@@ -175,8 +177,15 @@ def run(manifest: str, fast: str, strong: str | None, threshold: float, modes: l
     if reference and server.strong is not None:
         ref = reference_choices(server.strong, items)
         summary["head_agreement_with_strong"] = {m: head_agreement(rows, ref) for m, rows in runs.items()}
+    if baseline:
+        base = json.loads(Path(baseline).read_text())["modes"]
+        summary["gates_vs_baseline"] = {m: compare(base[m]["gates"]["all"], s["gates"]["all"])
+                                        for m, s in summary["modes"].items() if m in base}
     (out_dir / "summary.json").write_text(json.dumps(summary, indent=1, ensure_ascii=False) + "\n")
     md = markdown(summary["modes"], env, notes)
+    for m, verdict in summary.get("gates_vs_baseline", {}).items():
+        md += f"\n## Gates against {baseline} ({m}): {'PASS' if all(v['pass'] for v in verdict.values()) else 'FAIL'}\n\n"
+        md += "\n".join(f"- {k}: {'pass' if v['pass'] else 'FAIL'} ({v['why']})" for k, v in verdict.items()) + "\n"
     if "head_agreement_with_strong" in summary:
         md += "\n## Head agreement with the strong tier alone (not correctness)\n\n" + "\n".join(
             f"- {m}: operation {a['operation']:.1%}, heads the step uses {a['used_heads']:.1%} (n={a['n']})"
