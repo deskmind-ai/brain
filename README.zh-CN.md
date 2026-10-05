@@ -18,6 +18,8 @@
   <a href="README.md">English</a> · <a href="docs/results.zh-CN.md">成绩</a> · <a href="docs/training.zh-CN.md">训练</a>
 </p>
 
+> 本仓库属于 **[DeskMind](https://github.com/deskmind-ai/deskmind)**：App、演示和其他组件都从那里开始。问题和建议请提到 [deskmind 的 issues](https://github.com/deskmind-ai/deskmind/issues)（标签 `area: brain`）；PR 提到这里。
+
 ---
 
 **得心，应手。** 「得心」（DeskMind）取自「得心应手」：心里想到，手上就做到。它是一组开源项目，让 agent 在你的电脑上**看**懂屏幕、**想**好下一步、**做**到真实的桌面上，全程在本机完成。

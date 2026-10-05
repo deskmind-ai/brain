@@ -18,6 +18,8 @@
   <a href="README.zh-CN.md">中文</a> · <a href="docs/results.md">Results</a> · <a href="docs/training.md">Training</a>
 </p>
 
+> Part of **[DeskMind](https://github.com/deskmind-ai/deskmind)**: start there for the app, the demo and the other components. Issues and questions go to [deskmind issues](https://github.com/deskmind-ai/deskmind/issues) (label `area: brain`); pull requests come here.
+
 ---
 
 **DeskMind · 得心** — *得心，应手。* (from 得心应手: what the mind decides, the hand carries out) is a family of open-source
