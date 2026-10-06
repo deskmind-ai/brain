@@ -73,7 +73,6 @@ def test_choice_criteria_list_keeps_sent_order():
 @pytest.mark.parametrize("criteria", [
     [{"key": "a", "description": "x"}, {"key": "a", "description": "y"}],
     [{"key": "", "description": "x"}],
-    [{"key": "a", "description": 3}],
     [{"key": "a"}],
     [{"key": "a", "description": "x", "extra": 1}],
     ["a"],

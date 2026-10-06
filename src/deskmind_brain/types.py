@@ -28,17 +28,18 @@ class Question(BaseModel):
     @classmethod
     def _criteria_list_form(cls, data: Any) -> Any:
         """Protocol v1 also sends choice criteria as `[{"key", "description"}]`, which keeps the option order explicit
-        instead of leaving it to JSON object order. Both forms become the same ordered map, so `options()` and the
-        prompt are identical. Brain renders options in the order sent; order rules are checked by the harness."""
+        instead of leaving it to JSON object order. A description is any JSON value, as in the map form (agent heads
+        mostly send objects). Both forms become the same ordered map, so `options()` and the prompt are identical.
+        Brain renders options in the order sent; order rules are checked by the harness."""
         if not isinstance(data, dict) or data.get("type") != "choice" or not isinstance(data.get("criteria"), list):
             return data
-        criteria: dict[str, str] = {}
+        criteria: dict[str, Any] = {}
         for entry in data["criteria"]:
             if not isinstance(entry, dict) or set(entry) != {"key", "description"}:
                 raise ValueError('choice criteria entries must be {"key", "description"}')
             key, description = entry["key"], entry["description"]
-            if not isinstance(key, str) or not key or not isinstance(description, str):
-                raise ValueError("choice criteria key must be a non-empty string and description a string")
+            if not isinstance(key, str) or not key:
+                raise ValueError("choice criteria key must be a non-empty string")
             if key in criteria:
                 raise ValueError(f"duplicate choice criteria key: {key!r}")
             criteria[key] = description
