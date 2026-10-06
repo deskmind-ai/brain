@@ -298,3 +298,24 @@ def test_closed_loop_choices_judged_by_the_gates_match_what_happened_on_the_desk
             if it.meta["task_id"] == "gym-mail-邮筒-s0071" and r["missed_done"]] == [(4, True), (5, True)]
     assert not any(r["false_done"] for _, r in rows)
 
+
+def test_closed_loop_fixtures_keep_the_recorded_order_of_questions_and_options(monkeypatch):
+    """The order of a question's options is part of the request: it sets each option's letter and its place in the
+    prompt. The first build of this set sorted every dict's keys ('1', '10', '11', ... '2'), and the set replayed at
+    129-135 valid of 223 where the recorded choices judge to 220. Each fixture carries a digest of the recorded order."""
+    import hashlib
+    monkeypatch.delenv(PRIVATE_ENV, raising=False)
+    closed = [it for it in load_fixtures(load_manifest(MANIFEST_V2))[0] if it.meta["replay"]["set"] == "closedloop"]
+    long_lists = 0
+    for it in closed:
+        order = [[qid, list(q.criteria) if isinstance(q.criteria, dict) else []] for qid, q in it.questions.items()]
+        digest = hashlib.sha256(json.dumps(order, ensure_ascii=False).encode("utf-8")).hexdigest()
+        assert digest == it.meta["closed_loop"]["options_digest"], it.id
+        assert next(iter(it.questions)) == "operation", it.id   # as hands sends them, not alphabetical
+        for q in it.questions.values():
+            keys = list(q.criteria) if isinstance(q.criteria, dict) else []
+            if len(keys) >= 10 and all(k.isdigit() for k in keys):
+                long_lists += 1
+                assert keys == sorted(keys, key=int), (it.id, keys[:12])   # 1, 2, ... 10, 11: never '1', '10', '11'
+    assert long_lists > 100   # the check above did look at lists long enough to be mis-sorted
+

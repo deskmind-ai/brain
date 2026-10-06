@@ -18,12 +18,18 @@ write (steps 4-6: the right message was deleted, then another with the same subj
 Rows are hands' gym rows (one per model call: state, questions, answers, label). The routing log is brain's
 --routing-log for the same run; its last len(rows) lines are matched to the rows in order and checked by operation.
 The output is frozen like v1: the manifest records the count and sha256, and the loader refuses a changed file.
+
+Everything is written in the order it was recorded: the questions, each question's options and the state's fields.
+The first build sorted every dict's keys, which listed the options as '1', '10', '11', ... '2' and changed what the
+model was asked; each fixture now carries a digest of the recorded order (meta.closed_loop.options_digest) and a test
+checks the fixture against it.
 """
 
 from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import io
 import json
 from collections import Counter
@@ -36,6 +42,15 @@ from deskmind_brain.types import Question
 ROOT = Path(__file__).resolve().parent.parent
 V1, V2 = ROOT / "fixtures" / "replay" / "v1", ROOT / "fixtures" / "replay" / "v2"
 SET, RUN_LABEL = "closedloop", "closedloop.g18b-20261006"
+
+
+def options_digest(questions: dict) -> str:
+    """A digest of the questions' order and of every question's option order, taken from the recorded request. A
+    fixture whose questions or options come out in another order (an earlier build sorted every dict's keys, and the
+    set replayed at 129-135 valid of 223 against 220 on the recorded choices) no longer matches it."""
+    order = [[qid, list((q.get("criteria") or {}) if isinstance(q.get("criteria"), dict) else [])]
+             for qid, q in questions.items()]
+    return hashlib.sha256(json.dumps(order, ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
 def item_of(row: dict, routing: dict | None) -> EvalItem | None:
@@ -51,6 +66,9 @@ def item_of(row: dict, routing: dict | None) -> EvalItem | None:
             raise ValueError(f"{row['task']} step {row['step']}: label {qid}={choice!r} is not among the options")
         refs[qid] = Reference(probs={o: 1.0 if o == choice else 0.0 for o in opts}, n_sets=1, soft=False)
     answers = row.get("answers") or {}
+    if list(questions) != list(row["questions"]) or any(
+            questions[q].options() != list(row["questions"][q]["criteria"]) for q in questions if questions[q].type == "choice"):
+        raise ValueError(f"{row['task']} step {row['step']}: the questions or their options changed order")
     item = EvalItem(
         id=f"hands/{RUN_LABEL}/{row['task']}/{row['step']}", suite="hands_gym_closed_loop", group="desktop",
         state=row["state"], questions=questions, references=refs,
@@ -63,7 +81,9 @@ def item_of(row: dict, routing: dict | None) -> EvalItem | None:
                   "planner": "G18b router (brain-0.8b -> brain-4b g18b-q8, threshold 0.96, two-stage)",
                   "choices": {qid: (a or {}).get("choice") for qid, a in answers.items()},
                   "confidence": (answers.get("operation") or {}).get("confidence"),
-                  "routing": routing, "task_passed": (row.get("run_result") or {}).get("passed")}})
+                  "routing": routing, "task_passed": (row.get("run_result") or {}).get("passed"),
+                  # The request's questions and each one's options, in the order the planner was shown them.
+                  "options_digest": options_digest(row["questions"])}})
     session = session_of(item.id)
     item.meta["replay"] = {"set": SET, "session": session, "split": split_of(session), "categories": categories_of(item)}
     return item
@@ -90,7 +110,9 @@ def main() -> None:
     buf = io.BytesIO()
     with gzip.GzipFile(fileobj=buf, mode="wb", mtime=0) as gz:   # mtime=0: the same bytes every time
         for it in items:
-            gz.write((json.dumps(it.to_json(), ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8"))
+            # No sort_keys: the order of a question's options is part of the request (it decides each option's letter
+            # and its place in the prompt), and so is the order of the questions and of the state's fields.
+            gz.write((json.dumps(it.to_json(), ensure_ascii=False) + "\n").encode("utf-8"))
     out.write_bytes(buf.getvalue())
 
     v1 = json.loads((V1 / "manifest.json").read_text())

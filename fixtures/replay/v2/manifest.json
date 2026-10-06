@@ -64,7 +64,7 @@
    "source": "hands tools/gym/run.py --split 2 --beta 0, G18b router driving 75 held-out gym tasks (music, mail, settings); gym oracle labels; second machine, 2026-10-06 (deskmind#18)",
    "license": "Apache-2.0",
    "count": 223,
-   "sha256": "cd04fbdea3c3414a5d9fe2071cd6705a4f7703fe8c4fceb8f5b9dd943c46ff1d",
+   "sha256": "f7eda0733c211e7e0f1f2308a12aea518b03c79015a8049ff19b19a77b6ce07d",
    "note": "states from the model's own trajectory; meta.closed_loop keeps what it chose and whether the task passed (74/75): a regression set. gym-mail-邮筒-s0071 is the missed DONE"
   }
  ]
