@@ -214,20 +214,7 @@ def shared_prefix_len(sequences: list[list[int]]) -> int:
     return max(limit, 0)
 
 
-TEXT_OPS = {"TYPE_TEXT", "REPLACE_TEXT", "APPEND_TEXT", "RENAME"}
-TERMINAL_OPS = {"DONE", "BLOCKED", "ASK"}
-
-
-def heads_for(op: str, questions: dict) -> list[str]:
-    """The questions an agent step with operation `op` actually uses (agent-step naming, as hands sends it: `<op>_target`,
-    plus the value heads of text operations)."""
-    prefix = op.lower() + "_"
-    heads = [q for q in questions if q.startswith(prefix)]
-    if op in TEXT_OPS and "type_text_value" in questions:
-        heads.append("type_text_value")
-    if op == "REPLACE_TEXT" and "replace_from" in questions:
-        heads.append("replace_from")
-    return heads
+from deskmind_brain.heads import TERMINAL_OPS, TEXT_OPS, heads_for  # noqa: E402,F401 -- one definition for scorer and router
 
 
 class LogitsPredictorBase:

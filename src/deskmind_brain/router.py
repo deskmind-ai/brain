@@ -21,7 +21,7 @@ TERMINAL = {"DONE", "BLOCKED", "ASK"}
 # folder, delete, send, paste-move ...) escalates. In the first real-desktop router run 70 of 72 escalated chords were
 # cmd+s, and the 4B chose the same chord every time.
 SAFE_KEYS = {"cmd+s", "cmd+f", "cmd+c", "tab", "escape"}
-TEXT_OPS = {"TYPE_TEXT", "REPLACE_TEXT", "APPEND_TEXT", "RENAME"}
+from deskmind_brain.heads import TEXT_OPS, heads_for  # noqa: E402,F401 -- the scorer's definition, not a copy
 
 
 def top_prob(answer: dict) -> float:
@@ -30,16 +30,6 @@ def top_prob(answer: dict) -> float:
     if "noul" in answer:
         return max(answer["noul"], 1 - answer["noul"])
     return 0.0
-
-
-def heads_for(op: str, questions: dict) -> list[str]:
-    prefix = op.lower() + "_"
-    heads = [q for q in questions if q.startswith(prefix)]
-    if op in TEXT_OPS and "type_text_value" in questions:
-        heads.append("type_text_value")
-    if op == "REPLACE_TEXT" and "replace_from" in questions:
-        heads.append("replace_from")
-    return heads
 
 
 def is_undo_click(body: dict, answers: dict) -> bool:
