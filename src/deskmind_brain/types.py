@@ -9,7 +9,7 @@ from __future__ import annotations
 import math
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, StrictInt, model_validator
 
 QuestionType = Literal["choice", "score", "noul"]
 Distribution = dict[str, float]
@@ -71,7 +71,7 @@ class SystemOneRequest(BaseModel):
     # the schema says; never part of the prompt or the answer cache key.
     request_id: str | None = Field(default=None, min_length=1)
     session_id: str | None = Field(default=None, min_length=1)
-    step: int | None = Field(default=None, ge=1)
+    step: StrictInt | None = Field(default=None, ge=1)   # strict: "3", True and 3.0 are not a step
     observation_id: str | None = Field(default=None, min_length=1)
     state_digest: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
 

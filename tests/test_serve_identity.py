@@ -36,7 +36,8 @@ def test_routing_log_records_the_identity(tmp_path):
     assert "state" not in rec and "questions" not in rec                      # still metadata only
 
 
-@pytest.mark.parametrize("bad", [{"step": 0}, {"request_id": ""}, {"state_digest": "md5:abc"}])
+@pytest.mark.parametrize("bad", [{"step": 0}, {"step": "3"}, {"step": True}, {"step": 3.0}, {"request_id": ""},
+                                 {"state_digest": "md5:abc"}])
 def test_identity_fields_are_validated(bad):
     with pytest.raises(ValidationError):
         SystemOneRequest(**body(**bad))
