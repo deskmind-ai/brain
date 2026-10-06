@@ -117,6 +117,56 @@ def load_fixtures(manifest: Manifest, split: str | None = None, check_hash: bool
     return items, notes
 
 
+# ---------------------------------------------------------------------------------------------------- releases
+
+# sha256 of model.safetensors for each released pair, as the app's models.json pins them. A run records which release
+# its weights are, and a run named for a release (label, --out folder, --release) refuses any other weights: the first
+# "G18b" baseline was run on G17 weights left in the default model folder, and nothing noticed.
+RELEASES = {
+    "g17": {"fast": "9513c6edcb5126fb1c64885bfa8531a4dc37c69bde8f373e034dea44f08e5b43",
+            "strong": "c5a200f077bc23bbcbcc0cff5c196f8d4260e4674169c083678077e95b768f39"},
+    "g18b": {"fast": "e5a1fbc39bb8f6c92b2566ef53f9b96ba012bc49dd3e45790f52b686a0cb519e",
+             "strong": "3b1524ca3be1cf60d8a90a4a219544cba5651fcbdd884c5391e86146aa1bdfd1"},
+}
+_RELEASE_TAG = re.compile(r"(?<![a-z0-9])(g\d+[a-z]?)(?![a-z0-9])", re.I)
+
+
+class WrongWeights(SystemExit):
+    """The loaded weights are not the release the run is named for."""
+
+
+def release_of(fast_sha: str | None, strong_sha: str | None) -> str | None:
+    """The release whose weights these are (both tiers, or the fast tier alone when there is no strong one)."""
+    for name, r in RELEASES.items():
+        if fast_sha == r["fast"] and strong_sha in (None, r["strong"]):
+            return name
+    return None
+
+
+def releases_named(*names: str | None) -> set[str]:
+    """Known release tags in these names ('baseline v1 (G18b, app 0.4.0)', 'baseline-g18b'); unknown tags are ignored,
+    so a candidate named g19-something is not refused for want of a release entry."""
+    return {m.lower() for n in names if n for m in _RELEASE_TAG.findall(n) if m.lower() in RELEASES}
+
+
+def check_release(fast_sha: str | None, strong_sha: str | None, *names: str | None,
+                  expect: str | None = None) -> str | None:
+    """The release of the loaded weights; raises WrongWeights if `expect` or a release named in `names` is another one."""
+    if expect is not None and expect.lower() not in RELEASES:
+        raise WrongWeights(f"--release {expect}: no such release (known: {', '.join(RELEASES)})")
+    claimed = releases_named(*names) | ({expect.lower()} if expect else set())
+    found = release_of(fast_sha, strong_sha)
+    if len(claimed) > 1:
+        raise WrongWeights(f"this run is named for more than one release: {sorted(claimed)}")
+    for want in claimed:
+        if found != want:
+            got = found.upper() if found else f"unknown weights (fast {str(fast_sha)[:8]}, strong {str(strong_sha)[:8]})"
+            raise WrongWeights(f"this run is named for {want.upper()} but the loaded weights are {got}; expected fast "
+                               f"{RELEASES[want]['fast'][:8]}, strong {RELEASES[want]['strong'][:8]}. Point --fast/--strong "
+                               "at that release's folders (the app's default model folder may hold an older one).")
+    return found
+
+
 def session_of(item_id: str) -> str:
     """The task run a step belongs to: the id without its step number (and a pair suffix such as /live0)."""
     parts = item_id.split("/")
