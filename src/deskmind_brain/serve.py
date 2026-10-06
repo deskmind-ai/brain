@@ -33,6 +33,10 @@ from deskmind_brain.router import route
 from deskmind_brain.types import SystemOneRequest
 
 
+# Choice criteria forms this server accepts (deskmind#36 item 1): harnesses send the list form only when it is listed.
+CRITERIA_FORMS = ("object", "list")
+
+
 class Server:
     def __init__(self, spec: str, model_name: str, cache_size: int = 64, escalate_to: str | None = None,
                  threshold: float = 0.94, keep_done_over_undo: bool = True, routing_log: str | None = None):
@@ -63,8 +67,11 @@ class Server:
         request = SystemOneRequest(**body)
         item = EvalItem(id=uuid.uuid4().hex, suite="serve", group="serve", state=request.state,
                         questions=request.questions, references={})
-        key = hashlib.sha256(json.dumps({"state": body.get("state"), "questions": body.get("questions")},
-                                        sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        # The router reads criteria from the body; give it the parsed form, so the list form reads like the map form.
+        body = {**body, "questions": {k: q.model_dump(exclude_none=True) for k, q in request.questions.items()}}
+        # No sort_keys: option order decides each option's letter, so a reordered request is a different request.
+        key = hashlib.sha256(json.dumps({"state": body.get("state"), "questions": body["questions"]},
+                                        ensure_ascii=False).encode()).hexdigest()
         with self.lock:
             cached = self.cache.get(key) if self.cache_size else None
             if cached is not None:
@@ -156,7 +163,7 @@ def make_handler(server: Server, token: str | None = None):
             if not self._authorized():
                 return
             if self.path.rstrip("/") == "/v1/models":
-                entry = {"id": server.model_name, "object": "model"}
+                entry = {"id": server.model_name, "object": "model", "criteria_forms": list(CRITERIA_FORMS)}
                 if server.strong is not None:
                     entry["routing"] = dict(server.routed)
                 self._send(200, {"data": [entry]})

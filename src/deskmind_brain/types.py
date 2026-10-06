@@ -24,11 +24,31 @@ class Question(BaseModel):
     instructions: Any
     criteria: Any = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _criteria_list_form(cls, data: Any) -> Any:
+        """Protocol v1 also sends choice criteria as `[{"key", "description"}]`, which keeps the option order explicit
+        instead of leaving it to JSON object order. Both forms become the same ordered map, so `options()` and the
+        prompt are identical. Brain renders options in the order sent; order rules are checked by the harness."""
+        if not isinstance(data, dict) or data.get("type") != "choice" or not isinstance(data.get("criteria"), list):
+            return data
+        criteria: dict[str, str] = {}
+        for entry in data["criteria"]:
+            if not isinstance(entry, dict) or set(entry) != {"key", "description"}:
+                raise ValueError('choice criteria entries must be {"key", "description"}')
+            key, description = entry["key"], entry["description"]
+            if not isinstance(key, str) or not key or not isinstance(description, str):
+                raise ValueError("choice criteria key must be a non-empty string and description a string")
+            if key in criteria:
+                raise ValueError(f"duplicate choice criteria key: {key!r}")
+            criteria[key] = description
+        return {**data, "criteria": criteria}
+
     @model_validator(mode="after")
     def _check_criteria(self) -> Question:
         if self.type == "choice":
             if not isinstance(self.criteria, dict) or not (1 <= len(self.criteria) <= MAX_CHOICE_OPTIONS):
-                raise ValueError(f"choice criteria must be a map with 1..{MAX_CHOICE_OPTIONS} options")
+                raise ValueError(f"choice criteria must be a map or a list with 1..{MAX_CHOICE_OPTIONS} options")
         elif self.type == "score":
             if not isinstance(self.criteria, list) or not (MIN_SCORE_LEVELS <= len(self.criteria) <= MAX_SCORE_LEVELS):
                 raise ValueError(f"score criteria must be a list of {MIN_SCORE_LEVELS}..{MAX_SCORE_LEVELS} levels")
