@@ -357,7 +357,7 @@ def test_matching_or_unnamed_runs_record_the_release():
     assert check_release(G18B["fast"], G18B["strong"], "big18bucket", "xg18b") == "g18b"  # tags are whole words
 
 
-@pytest.mark.parametrize("path", sorted((MANIFEST.parent.parent).glob("*/baseline-*.json")), ids=lambda p: p.parent.name)
+@pytest.mark.parametrize("path", sorted((MANIFEST.parent.parent).glob("*/baseline-*.json")), ids=lambda p: f"{p.parent.name}/{p.name}")
 def test_shipped_baselines_were_run_on_the_release_they_are_named_for(path):
     env = json.loads(path.read_text())["env"]
     named = path.stem.removeprefix("baseline-")

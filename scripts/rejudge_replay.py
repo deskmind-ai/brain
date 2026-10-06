@@ -3,7 +3,7 @@
 For a gates change: the run's latency is kept as it was, every gate is recomputed, and the summary records which
 version judged it. Private fixture sets need $DESKMIND_REPLAY_PRIVATE, as for the run itself.
 
-    python scripts/rejudge_replay.py fixtures/replay/v1/manifest.json runs/replay/baseline-v1 \
+    python scripts/rejudge_replay.py fixtures/replay/v1/manifest.json runs/replay/baseline-g18b-v1 \
         --summary fixtures/replay/v1/baseline-g18b.json
 """
 
