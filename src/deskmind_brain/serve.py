@@ -65,6 +65,7 @@ class Server:
 
     def answer(self, body: dict) -> dict:
         request = SystemOneRequest(**body)
+        ident = request.identity()   # echoed in the reply and the routing log; not part of the cache key
         item = EvalItem(id=uuid.uuid4().hex, suite="serve", group="serve", state=request.state,
                         questions=request.questions, references={})
         # The router reads criteria from the body; give it the parsed form, so the list form reads like the map form.
@@ -77,7 +78,7 @@ class Server:
             if cached is not None:
                 self.cache.move_to_end(key)
                 self.hits += 1
-                return {**cached, "id": item.id, "cached": True}
+                return {**cached, "id": item.id, "cached": True, **ident}
             self.misses += 1
             started = time.perf_counter()
             prediction = self.predictor.predict(item)
@@ -92,7 +93,7 @@ class Server:
                     fast_op = ((self._plain(prediction.answers).get("operation") or {}).get("choice"))
                     final_op = ((answers.get("operation") or {}) if isinstance(answers.get("operation"), dict) else {}).get("choice")
                     with open(self.routing_log, "a") as f:
-                        f.write(json.dumps({"t": round(time.time(), 3), "escalated": routing["by"] == "strong",
+                        f.write(json.dumps({"t": round(time.time(), 3), **ident, "escalated": routing["by"] == "strong",
                                             "reason": routing["reason"], "fast_op": fast_op, "final_op": final_op,
                                             "conf": routing["fast_conf"],
                                             "total_s": round(time.perf_counter() - started, 3)}) + "\n")
@@ -108,10 +109,10 @@ class Server:
             reply["routing"] = routing
         if self.cache_size:
             with self.lock:
-                self.cache[key] = reply
+                self.cache[key] = reply   # without the identity: a later hit echoes its own request's
                 while len(self.cache) > self.cache_size:
                     self.cache.popitem(last=False)
-        return reply
+        return {**reply, **ident}
 
 
     @staticmethod
