@@ -326,6 +326,7 @@ class LogitsPredictorBase:
     def predict(self, item: EvalItem) -> Prediction:
         start = time.perf_counter()
         self.stats = self.new_stats()
+        self._unscored: set[str] = set()
         try:
             if self.two_stage and "operation" in item.questions:
                 dists = self._predict_two_stage(item)
@@ -334,6 +335,8 @@ class LogitsPredictorBase:
         finally:
             self._release_memory()
         answers = {qid: to_answer(q, normalize(dists[qid], q.options())) for qid, q in item.questions.items()}
+        for qid in self._unscored:  # protocol v1 (deskmind#36 item 2): uniform here is a placeholder, not an answer
+            answers[qid]["scored"] = False
         self.stats["total_s"] = time.perf_counter() - start
         return Prediction(item_id=item.id, answers=answers, latency_s=self.stats["total_s"], cost_usd=0.0)
 
@@ -361,10 +364,11 @@ class LogitsPredictorBase:
             dists.update(self._run_rounds(context, needed))
         finally:
             self._prefix_hint = None
-        for qid, q in questions.items():  # not asked this step: uniform, so no one mistakes it for an answer
+        for qid, q in questions.items():  # not asked this step: uniform, and marked so (predict sets scored: false)
             if qid not in dists:
                 opts = q.options()
                 dists[qid] = {o: 1.0 / len(opts) for o in opts}
+                self._unscored.add(qid)
         return dists
 
     def _predict_distributions(self, item: EvalItem) -> dict[str, dict[str, float]]:

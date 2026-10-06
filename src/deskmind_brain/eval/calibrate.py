@@ -41,7 +41,8 @@ def apply(item: EvalItem, pred: Prediction, temps: dict[str, float]) -> Predicti
     for qid, answer in pred.answers.items():
         q = item.questions.get(qid)
         t = temps.get(kind(q), 1.0) if q else 1.0
-        answers[qid] = answer if q is None or t == 1.0 else to_answer(q, rescale(from_answer(q, answer), t))
+        unscored = answer.get("scored") is False  # a placeholder stays one: rescaling uniform is uniform anyway
+        answers[qid] = answer if q is None or t == 1.0 or unscored else to_answer(q, rescale(from_answer(q, answer), t))
     return Prediction(pred.item_id, answers, latency_s=pred.latency_s, cost_usd=pred.cost_usd, usage=pred.usage)
 
 
