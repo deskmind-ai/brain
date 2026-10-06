@@ -257,3 +257,44 @@ def test_shipped_public_fixtures_are_frozen_and_split_by_session(monkeypatch):
                    for q in it.references)
     assert all(len(v) == 1 for v in splits.values())
     assert {"dev", "holdout"} == {s for v in splits.values() for s in v}
+
+
+MANIFEST_V2 = MANIFEST.parent.parent / "v2" / "manifest.json"
+
+
+def test_v2_manifest_adds_the_closed_loop_set_and_leaves_v1_as_it_is(monkeypatch):
+    monkeypatch.delenv(PRIVATE_ENV, raising=False)
+    v1, v2 = load_manifest(MANIFEST), load_manifest(MANIFEST_V2)
+    old = {s.name: s for s in v1.sets}
+    assert [s.name for s in v2.sets] == [s.name for s in v1.sets] + ["closedloop"]
+    assert all((s.count, s.sha256, s.visibility) == (old[s.name].count, old[s.name].sha256, old[s.name].visibility)
+               for s in v2.sets if s.name in old)   # the same files, read from ../v1
+    items, _ = load_fixtures(v2)   # checks every public file's count and sha256
+    v1_items, _ = load_fixtures(v1)
+    assert [it.id for it in items[: len(v1_items)]] == [it.id for it in v1_items]
+    closed = items[len(v1_items):]
+    assert len(closed) == 223 and {it.meta["replay"]["set"] for it in closed} == {"closedloop"}
+    splits: dict[str, set] = {}
+    for it in closed:
+        splits.setdefault(it.meta["replay"]["session"], set()).add(it.meta["replay"]["split"])
+        assert it.meta["replay"]["categories"] == categories_of(it)
+        assert all(set(it.references[q].probs) <= set(it.questions[q].options()) for q in it.references)
+    assert len(splits) == 75 and all(len(v) == 1 for v in splits.values())   # 75 task runs, none on both sides
+
+
+def test_closed_loop_choices_judged_by_the_gates_match_what_happened_on_the_desktop(monkeypatch):
+    """The set keeps what the planner chose in each state. Judged by the gates: 220 of 223 valid under version 2 (182
+    under version 1's every-labelled-head rule), and the three that are not are the one task that failed."""
+    monkeypatch.delenv(PRIVATE_ENV, raising=False)
+    closed = [it for it in load_fixtures(load_manifest(MANIFEST_V2))[0] if it.meta["replay"]["set"] == "closedloop"]
+    rows = [(it, judge_choices(it, it.meta["closed_loop"]["choices"])) for it in closed]
+    assert sum(r["valid_action"] for _, r in rows) == 220
+    assert sum(r["valid_action_strict"] for _, r in rows) == 182
+    wrong = [(it.meta["task_id"], it.meta["step"]) for it, r in rows if not r["valid_action"]]
+    assert wrong == [("gym-mail-邮筒-s0071", 4), ("gym-mail-邮筒-s0071", 5), ("gym-mail-邮筒-s0071", 6)]
+    assert {it.meta["task_id"] for it, _ in rows if it.meta["closed_loop"]["task_passed"] is False} == {"gym-mail-邮筒-s0071"}
+    # The missed DONE: the task was done at steps 4 and 5 and the planner went on (and deleted a second message).
+    assert [(it.meta["step"], r["missed_done"]) for it, r in rows
+            if it.meta["task_id"] == "gym-mail-邮筒-s0071" and r["missed_done"]] == [(4, True), (5, True)]
+    assert not any(r["false_done"] for _, r in rows)
+

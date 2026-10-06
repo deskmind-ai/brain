@@ -41,6 +41,32 @@ holdout split for a decision. `--limit N` is a smoke run.
   steps), large candidate lists (over 52 options: a tournament), exact text, ambiguity, terminal (DONE or a
   done/not-done variant).
 
+## Fixtures, version 2: the closed-loop set
+
+`fixtures/replay/v2/manifest.json` lists version 1's five sets unchanged (the public three read from `../v1`, the
+private two from `$DESKMIND_REPLAY_PRIVATE` as before) and adds one public set. Version 1's manifest and baseline stay
+as they are. **No baseline has been run over version 2 yet**, so it cannot gate anything until one is.
+
+| set | n | visibility | source |
+|---|---|---|---|
+| closedloop | 223 | public | G18b as the app runs it, driving 75 held-out gym tasks by itself (`tools/gym/run.py --split 2 --beta 0`; music, mail, settings, 25 each) on a second machine with released Peekaboo 4.7.0, 2026-10-06; gym-oracle labels |
+
+- **What is different:** every state is one the model reached on its own, and each fixture keeps what the model
+  chose there (`meta.closed_loop`: choices, confidence, routing, whether the task passed). A gate's verdict on a
+  replayed answer can be set against what happened on the desktop.
+- **It is a regression set, not a hard one:** 74 of the 75 tasks passed. Judged by the gates, the choices the model
+  made are valid in 220 of 223 decisions (182 under version 1's every-labelled-head rule), with no false DONE.
+- **The one failure is a missed DONE with an irreversible write:** `gym-mail-邮筒-s0071`. The right message was
+  deleted by step 3; at steps 4 and 5 the gold is DONE and the model opened another message with the same subject and
+  clicked delete (operation confidence 0.82 and 0.94), then confirmed it at step 6. `missed_done` flags steps 4 and 5.
+  `write_on_done` does not: the write was a CLICK on a delete button, and CLICK is not a write operation.
+- **Split:** by task run, as in version 1 (162 dev, 61 holdout over 75 runs). Goal templates are not kept apart:
+  the same template can have one run on each side.
+- **Content:** synthetic gym pages only (every page is GymHost); no login name and no local path in any row.
+- Rebuild with `scripts/build_replay_closedloop.py` from the run's rows and routing log; the file comes out byte for
+  byte the same.
+- **Do not train on these.**
+
 ## Gates (version 2, frozen before any optimisation)
 
 | gate | applies to | allowance against the baseline |
