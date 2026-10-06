@@ -1,4 +1,5 @@
 """One heads_for for scorer and router, matching the protocol registry; G1: TYPE_FOCUSED's value head is scored."""
+import os
 from pathlib import Path
 
 import pytest
@@ -7,7 +8,9 @@ from deskmind_brain.eval import logits_base
 from deskmind_brain import router
 from deskmind_brain.heads import heads_for
 
-REGISTRY = Path(__file__).resolve().parents[2] / "deskmind" / "protocol" / "agent" / "operations.yaml"
+# The protocol registry, from a deskmind checkout: $DESKMIND_REPO (CI checks it out), else one next to this repo.
+_REPO = Path(os.environ.get("DESKMIND_REPO") or Path(__file__).resolve().parents[2] / "deskmind")
+REGISTRY = _REPO / "protocol" / "agent" / "operations.yaml"
 
 
 def test_scorer_and_router_share_one_definition():
