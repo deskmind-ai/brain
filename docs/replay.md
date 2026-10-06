@@ -65,6 +65,11 @@ as they are. **No baseline has been run over version 2 yet**, so it cannot gate 
 - **Content:** synthetic gym pages only (every page is GymHost); no login name and no local path in any row.
 - Rebuild with `scripts/build_replay_closedloop.py` from the run's rows and routing log; the file comes out byte for
   byte the same.
+- **Rebuilt once (2026-10-06).** The first build sorted every dict's keys, which reordered each question's options
+  ('1', '10', '11', ... '2') and so changed the letters and the prompt the model was given: the set replayed at
+  129-135 valid of 223. The file now keeps the recorded order of the questions, their options and the state, each
+  fixture carries a digest of that order, and a test checks it. Results from replaying the first build are void;
+  the 220 / 182 judged on the recorded choices never depended on order.
 - **Do not train on these.**
 
 ## Gates (version 2, frozen before any optimisation)
