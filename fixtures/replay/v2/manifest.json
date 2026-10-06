@@ -1,0 +1,71 @@
+{
+ "name": "deskmind-brain-replay",
+ "version": "2",
+ "gates_version": "2",
+ "seed": 16,
+ "split": "by session, sha256(replay-v1:<session>) < 0.3 -> holdout",
+ "do_not_train": true,
+ "note": "version 1's five sets, unchanged and read from ../v1 (the private two from $DESKMIND_REPLAY_PRIVATE as before), plus closedloop. Version 1's manifest and baseline stay as they are; a baseline over this manifest has to be run before it can gate anything.",
+ "sets": [
+  {
+   "name": "gym",
+   "path": "../v1/gym.jsonl.gz",
+   "visibility": "public",
+   "source": "openjev data/eval/g19_gym_*_heldout (hands gym oracle labels)",
+   "license": "Apache-2.0",
+   "count": 150,
+   "sha256": "5fac3a106e3981c0f5f663e7f8789e674a7d784e1649efd30dd8c1b5239a85c2",
+   "note": ""
+  },
+  {
+   "name": "pairs",
+   "path": "../v1/pairs.jsonl.gz",
+   "visibility": "public",
+   "source": "openjev data/eval/live_pairs_heldout (gym music done/not-done twins)",
+   "license": "Apache-2.0",
+   "count": 42,
+   "sha256": "9bcf2fbbdbe541f8d11e071db19104b54b0f325e5db7626467086823bc3ad2e3",
+   "note": ""
+  },
+  {
+   "name": "large",
+   "path": "../v1/large.jsonl.gz",
+   "visibility": "public",
+   "source": "g19_gym_mail_heldout row clicks + synthetic filler rows (this script)",
+   "license": "Apache-2.0",
+   "count": 30,
+   "sha256": "4ddf03fb36e7253996f0bdafd0d9b92b5ed4a41ce87067c82efdbc9ecc3038b6",
+   "note": "derived: labels inherited, filler rows are never the target"
+  },
+  {
+   "name": "ambiguity",
+   "path": "ambiguity.jsonl.gz",
+   "visibility": "private",
+   "source": "openjev scripts/ambiguity_ask_data.py --seed 1016 (real skeleton, generated strings)",
+   "license": "internal",
+   "count": 70,
+   "sha256": "0ed2ff6795cd1e4eb6fb587ce416cad7f04389a8424e1ff4a508f569e3a11356",
+   "note": "no exact state overlap with the g14-g18 ambiguity training sets"
+  },
+  {
+   "name": "text",
+   "path": "text.jsonl.gz",
+   "visibility": "private",
+   "source": "openjev data/eval/multirow_copy_heldout (real skeleton, generated strings)",
+   "license": "internal",
+   "count": 30,
+   "sha256": "78e623cbf378ec76c6928e0f565caa597bc7ae65b20b8096a97d71bca0f2c9fb",
+   "note": ""
+  },
+  {
+   "name": "closedloop",
+   "path": "closedloop.jsonl.gz",
+   "visibility": "public",
+   "source": "hands tools/gym/run.py --split 2 --beta 0, G18b router driving 75 held-out gym tasks (music, mail, settings); gym oracle labels; second machine, 2026-10-06 (deskmind#18)",
+   "license": "Apache-2.0",
+   "count": 223,
+   "sha256": "cd04fbdea3c3414a5d9fe2071cd6705a4f7703fe8c4fceb8f5b9dd943c46ff1d",
+   "note": "states from the model's own trajectory; meta.closed_loop keeps what it chose and whether the task passed (74/75): a regression set. gym-mail-邮筒-s0071 is the missed DONE"
+  }
+ ]
+}
