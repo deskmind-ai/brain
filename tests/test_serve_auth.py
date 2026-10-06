@@ -57,3 +57,8 @@ def test_token_required_on_every_route(serve):
     assert call(base + "/v1/models", auth="Bearer s3cret")[0] == 200
     assert call(base + "/v1/systemone", auth="Bearer s3cret", body={}) == (200, {"ok": True})
     assert call(base + "/nope", auth="Bearer s3cret")[0] == 404
+
+
+def test_models_lists_criteria_forms(serve):
+    status, reply = call(serve(None) + "/v1/models")
+    assert status == 200 and reply["data"][0]["criteria_forms"] == ["object", "list"]

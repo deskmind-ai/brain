@@ -54,3 +54,30 @@ def test_score_answer_fields():
 def test_hard_answers_become_one_hot():
     assert from_answer(CHOICE, {"type": "choice", "choice": "sales"}) == {"billing": 0.0, "technical": 0.0, "sales": 1.0}
     assert from_answer(SCORE, {"type": "score", "score": 1.4}) == {"0": 0.0, "1": 1.0, "2": 0.0}
+
+
+def test_choice_criteria_list_form_is_the_map_form():
+    as_list = [{"key": "billing", "description": "b"}, {"key": "technical", "description": "t"},
+               {"key": "sales", "description": "s"}]
+    q = Question(type="choice", instructions="team?", criteria=as_list)
+    assert q.criteria == CHOICE.criteria
+    assert q.options() == ["billing", "technical", "sales"]
+    assert q.model_dump() == CHOICE.model_dump()
+
+
+def test_choice_criteria_list_keeps_sent_order():
+    q = Question(type="choice", instructions="x", criteria=[{"key": k, "description": k} for k in ["2", "10", "1"]])
+    assert q.options() == ["2", "10", "1"]
+
+
+@pytest.mark.parametrize("criteria", [
+    [{"key": "a", "description": "x"}, {"key": "a", "description": "y"}],
+    [{"key": "", "description": "x"}],
+    [{"key": "a"}],
+    [{"key": "a", "description": "x", "extra": 1}],
+    ["a"],
+    [],
+])
+def test_choice_criteria_list_form_rejects(criteria):
+    with pytest.raises(ValueError):
+        Question(type="choice", instructions="x", criteria=criteria)
