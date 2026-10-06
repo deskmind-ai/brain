@@ -9,7 +9,7 @@ from __future__ import annotations
 import math
 from typing import Any, Literal
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, StrictInt, model_validator
 
 QuestionType = Literal["choice", "score", "noul"]
 Distribution = dict[str, float]
@@ -67,6 +67,17 @@ class SystemOneRequest(BaseModel):
     state: Any
     model: str = "deskmind-brain-local"
     questions: dict[str, Question]
+    # Request identity (protocol v1, deskmind#36 item 4): which step of which run this is for. Optional; validated as
+    # the schema says; never part of the prompt or the answer cache key.
+    request_id: str | None = Field(default=None, min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
+    step: StrictInt | None = Field(default=None, ge=1)   # strict: "3", True and 3.0 are not a step
+    observation_id: str | None = Field(default=None, min_length=1)
+    state_digest: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
+
+    def identity(self) -> dict[str, Any]:
+        """What a reply echoes and the routing log records: request_id, session_id, step, as sent."""
+        return {k: getattr(self, k) for k in ("request_id", "session_id", "step") if getattr(self, k) is not None}
 
 
 def normalize(dist: dict[str, float], options: list[str]) -> Distribution:
