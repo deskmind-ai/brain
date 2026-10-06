@@ -138,6 +138,15 @@ def use_two_stage(server: Server) -> None:
         getattr(server.strong, "inner", server.strong).terminal_heads = False
 
 
+def error_body(code: str, message: str, *, field: str | None = None, retryable: bool = False) -> dict:
+    """The one error shape (protocol v1, deskmind#36 item 5): every status, 401 included, carries a code a client can
+    branch on, the message, the request field at fault when there is one, and whether trying again can help."""
+    err = {"code": code, "message": message[:500], "retryable": retryable}
+    if field:
+        err["field"] = field
+    return {"error": err}
+
+
 def make_handler(server: Server, token: str | None = None):
     """With a non-empty `token`, every request must send `Authorization: Bearer <token>`; others get 401. The Mac app
     sets one per install, so a process that merely listens on the expected port cannot pose as its model server."""
@@ -149,7 +158,7 @@ def make_handler(server: Server, token: str | None = None):
                 return True
             if hmac.compare_digest(self.headers.get("Authorization", "").encode(), expected):
                 return True
-            self._send(401, {"error": "unauthorized"})
+            self._send(401, error_body("unauthorized", "missing or wrong bearer token"))
             return False
 
         def _send(self, status: int, payload: dict) -> None:
@@ -169,25 +178,36 @@ def make_handler(server: Server, token: str | None = None):
                     entry["routing"] = dict(server.routed)
                 self._send(200, {"data": [entry]})
             else:
-                self._send(404, {"error": {"message": "not found"}})
+                self._send(404, error_body("not_found", "not found"))
 
         def do_POST(self) -> None:  # noqa: N802
             if not self._authorized():
                 return
             if self.path.rstrip("/") != "/v1/systemone":
-                self._send(404, {"error": {"message": "not found"}})
+                self._send(404, error_body("not_found", "not found"))
                 return
             try:
                 body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+            except (ValueError, UnicodeDecodeError) as e:   # JSONDecodeError is a ValueError; so is a bad length
+                self._send(400, error_body("invalid_json", f"the body is not JSON: {e}"))
+                return
+            if not isinstance(body, dict):
+                self._send(400, error_body("invalid_request", "the request must be a JSON object"))
+                return
+            try:
                 self._send(200, server.answer(body))
-            except (json.JSONDecodeError, ValidationError, TypeError, ValueError) as e:
-                self._send(400, {"error": {"message": str(e)[:500]}})
+            except ValidationError as e:
+                # Only the request's own validation is a 400 (SystemOneRequest is the first thing answer does); a
+                # ValueError while answering is the server's fault and a 500, not the client's (G5).
+                first = (e.errors() or [{}])[0]
+                field = ".".join(str(p) for p in first.get("loc", ()))
+                self._send(400, error_body("invalid_request", str(e), field=field or None))
             except Exception as e:  # noqa: BLE001 — report instead of dropping the connection
-                self._send(500, {"error": {"message": f"{type(e).__name__}: {e}"[:500]}})
+                self._send(500, error_body("internal_error", f"{type(e).__name__}: {e}"))
 
         def do_PUT(self) -> None:  # noqa: N802
             if self._authorized():
-                self._send(404, {"error": {"message": "not found"}})
+                self._send(404, error_body("not_found", "not found"))
 
         do_DELETE = do_PATCH = do_PUT
 
