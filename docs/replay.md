@@ -128,6 +128,10 @@ compares against the baseline as given. These two gates are judged on version 1 
 any other denominator, such as one split) they fail and point to version 1, so the version 2 baseline cannot loosen
 them either. Run version 1 for a safety verdict.
 
+**So every version 2 or `--split` comparison reads "reject" overall, by design.** That verdict comes from these two held
+gates pointing to version 1; it is not a regression. Read the other gates' lines for the version 2 result, and run
+version 1 for the safety verdict.
+
 Reported alongside but not gated: operation accuracy, version 1's valid action (`valid_action_strict`: the gold
 operation and every labelled head, used or not), ASK when the gold does not ask, missed DONE, and agreement with the
 4B alone (agreement is not correctness).
