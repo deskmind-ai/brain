@@ -11,7 +11,7 @@ the baseline.
 ```bash
 # both tiers as the app installs them (any mlx:<dir> works; pin the revisions below)
 uv run --extra mlx python scripts/replay_requests.py --manifest fixtures/replay/v1/manifest.json \
-    --fast mlx:models/brain-0.8b --strong mlx:models/brain-4b --threshold 0.96 \
+    --fast mlx:models/brain-0.8b --strong mlx:models/brain-4b --threshold 0.96 --release g18b \
     --baseline fixtures/replay/v1/baseline-g18b.json --out runs/replay/<label>
 ```
 
@@ -19,6 +19,11 @@ Writes `cold.jsonl` / `warm.jsonl` (one row per request), `summary.json` and `re
 `$DESKMIND_REPLAY_PRIVATE` the private sets are skipped and the report says so; compare a run only with a baseline over
 the same fixtures (`--baseline` fails every gate whose denominator differs). `--split dev` is for tuning; report the
 holdout split for a decision. `--limit N` is a smoke run.
+
+`--release g18b` stops the run before any model loads unless both tiers' weights hash to that release
+(`replay.RELEASES`, the sha256 the app's `models.json` pins); a release named in `--label` or the `--out` folder is
+checked the same way, and every run records `env.release`. Point `--fast`/`--strong` at the release's own folders:
+the app's default model folder can hold an older install than the one the app runs.
 
 ## Fixtures (v1, frozen)
 
@@ -45,7 +50,15 @@ holdout split for a decision. `--limit N` is a smoke run.
 
 `fixtures/replay/v2/manifest.json` lists version 1's five sets unchanged (the public three read from `../v1`, the
 private two from `$DESKMIND_REPLAY_PRIVATE` as before) and adds one public set. Version 1's manifest and baseline stay
-as they are. **No baseline has been run over version 2 yet**, so it cannot gate anything until one is.
+as they are. **No baseline has been run over version 2 yet**, so it cannot gate anything until one is. The G18b one,
+pending (about 2 hours on an M4 Pro: 545 fixtures, cold, warm and the 4B alone; version 1 took 66 minutes):
+
+```bash
+DESKMIND_REPLAY_PRIVATE=<private fixture dir> uv run --extra mlx python scripts/replay_requests.py \
+    --manifest fixtures/replay/v2/manifest.json --fast mlx:models/brain-0.8b-g18b-q8 --strong mlx:models/brain-4b-g18b-q8 \
+    --threshold 0.96 --release g18b --label "baseline v2 (G18b, app 0.4.0 config)" --out runs/replay/baseline-g18b-v2
+cp runs/replay/baseline-g18b-v2/summary.json fixtures/replay/v2/baseline-g18b.json
+```
 
 | set | n | visibility | source |
 |---|---|---|---|
@@ -84,6 +97,11 @@ as they are. **No baseline has been run over version 2 yet**, so it cannot gate 
 | false DONE | gold is not DONE: the answer is DONE | none |
 | write on DONE | gold is DONE: the answer writes anyway, a missed DONE that cannot be undone (it also counts as an unauthorized write) | none |
 
+**Unauthorized write and write on DONE are held at G17 until the owner decides (brain#14):** at most 11/281 and
+4/79 on version 1's fixtures, whatever `--baseline` says (`replay.HELD_CEILINGS`; a stricter baseline still lowers
+them). G18b, the baseline below, has 14/281 and 6/79, so under these gates **G18b itself fails both**. Every other gate
+compares against the baseline as given.
+
 Reported alongside but not gated: operation accuracy, version 1's valid action (`valid_action_strict`: the gold
 operation and every labelled head, used or not), ASK when the gold does not ask, missed DONE, and agreement with the
 4B alone (agreement is not correctness).
@@ -104,60 +122,81 @@ different versions are not compared; `scripts/rejudge_replay.py` judges a run ag
 
 ## Baseline: G18b as app 0.4.0 runs it
 
-Run 2026-10-06 on an M4 Pro (48 GB), macOS 27.2, mlx 0.32.2 / mlx-lm 0.31.3, brain 65f4ce4: deskmind/brain-0.8b
-(8-bit) and deskmind/brain-4b g18b-q8 as the app installs them, prompt format 3, threshold 0.96, all 322 fixtures.
-Full numbers, model hashes and every category: [`fixtures/replay/v1/baseline-g18b.json`](../fixtures/replay/v1/baseline-g18b.json).
+Run 2026-10-07 on an M4 Pro (48 GB), macOS 27.2, mlx 0.32.2 / mlx-lm 0.31.3, brain 61bd928: deskmind/brain-0.8b
+g18b-q8 and deskmind/brain-4b g18b-q8 (weights sha256 `e5a1fbc3…` and `3b1524ca…`, the pair the app's `models.json`
+pins), prompt format 3, threshold 0.96, all 322 fixtures, judged under gates version 2. Full numbers, model hashes and
+every category: [`fixtures/replay/v1/baseline-g18b.json`](../fixtures/replay/v1/baseline-g18b.json).
 
-**Latency (cold, the cleaner pass):**
+> **Correction (2026-10-07).** The baseline first published here as G18b was run on **G17** weights (`9513c6ed…`,
+> `c5a200f0…`): the run loaded the app's default model folder, which still held an earlier install, while the app
+> itself ran G18b from its local override. Its numbers are kept below as G17, and its summary moved to
+> [`fixtures/replay/v1/baseline-g17.json`](../fixtures/replay/v1/baseline-g17.json). A run now records which release
+> its weights are (`env.release`) and stops before loading a model when it is named for another one (`--release`, the
+> label or the `--out` folder); a test checks every shipped `baseline-<release>.json` against its name. Brain's code
+> also moved between the two runs (65f4ce4 to 61bd928); the only change that can alter an answer scores
+> TYPE_FOCUSED's value head, and no step in these fixtures is labelled or answered TYPE_FOCUSED.
+
+**Latency (cold, the cleaner pass), G18b with G17 in brackets:**
 
 | | n | p50 | p95 | prompt tokens p50 | escalated to 4B |
 |---|---|---|---|---|---|
-| all | 322 | 3.70 s | 15.0 s | 2,038 | 80% |
-| long context | 70 | 4.72 s | 23.5 s | 2,767 | 99% |
-| large candidate lists (100-240 options) | 30 | 15.1 s | 24.4 s | 7,411 | 100% |
-| exact text | 41 | 4.24 s | 5.9 s | 2,053 | 80% |
-| ambiguity | 70 | 1.63 s | 4.0 s | 1,659 | 33% |
-| terminal | 107 | 3.76 s | 4.7 s | 1,964 | 100% |
+| all | 322 | 3.39 s (3.70) | 13.7 s (15.0) | 2,025 | 72% (80%) |
+| long context | 70 | 4.19 s (4.72) | 22.0 s (23.5) | 2,752 | 94% (99%) |
+| large candidate lists (100-240 options) | 30 | 13.7 s (15.1) | 23.1 s (24.4) | 7,376 | 100% (100%) |
+| exact text | 41 | 3.83 s (4.24) | 5.6 s (5.9) | 2,053 | 78% (80%) |
+| ambiguity | 70 | 1.45 s (1.63) | 3.8 s (4.0) | 1,659 | 27% (33%) |
+| terminal | 107 | 3.00 s (3.76) | 4.1 s (4.7) | 1,906 | 83% (100%) |
+
+Fewer escalations account for much of the speed-up: G18b's 0.8B answers 89 steps itself against G17's 63,
+including 18 terminal steps G17 always escalated. The two runs were on the same machine on different nights, so
+per-request time is comparable only roughly.
 
 **Where the time goes (cold, share of summed request time):**
-- **prefill 66%**: about **51% prefilling the screen state** and 15% the stable head (system prompt, goal and
+- **prefill 67%**: about **52% prefilling the screen state** and 15% the stable head (system prompt, goal and
   rules; p50 654 of 1,672 prefix tokens), split by token count;
-- scoring the question branches 32% (on a step the fast tier calls DONE it scores every head: 6 branches, not 2);
+- scoring the question branches 31% (on a step the fast tier calls DONE it scores every head: 6 branches, not 2);
 - tokenization 1%, routing under 1%.
-- The 4B's prefill dominates: p50 2.2 s per escalated step against 0.37 s for the 0.8B.
+- The 4B's prefill dominates: p50 2.15 s per escalated step against 0.33 s for the 0.8B.
 - Peak Metal memory 12.4 GB, on a 240-option step.
+- G17 split the same way (66%: 51% state, 15% head; scoring 32%).
 
 **Checkpoint hits (warm):**
-- The format-3 head checkpoint hits on **32%** of requests (0.8B: 104/322; 4B: 80/259), and on 39% of steps that
-  continue a task.
+- The format-3 head checkpoint hits on **32%** of requests (0.8B: 104/322; 4B: 70/233), and on 39% of steps that
+  continue a task (99/257). G17: the same 104/322 on the 0.8B, 80/259 on the 4B.
 - Most misses are not evictions: the head itself changes between steps of one task. In 86 of 97 missed gym
   continuations the head had a different length, because the shared instructions are hoisted from the questions a
   step asks, and that set changes with what is on screen.
-- On a hit the 4B's prefill drops from 2.09 s to 1.76 s (p50, same requests), the 0.8B's from 0.30 s to 0.27 s.
+- On a hit the 4B's prefill drops from 1.93 s to 1.32 s (p50, same requests), the 0.8B's from 0.27 s to 0.19 s.
 - Answers are identical cold and warm (322/322), so checkpoint reuse does not change decisions.
-- The warm pass was slower end to end (p50 4.97 s) despite the hits. The machine was an ordinary desktop with other
-  GPU work (WindowServer, browsers), so compare configurations within one pass, not across passes.
+- The warm pass was faster end to end this time (p50 3.16 s against 3.39 s cold); G17's warm pass was slower
+  (4.97 s) on a busier desktop. Compare configurations within one pass, not across passes.
 
-**Gates (version 2, identical cold and warm; re-judged from the stored choices, the timings are unchanged):**
+**Gates (version 2, identical cold and warm), G18b against G17:**
 
-| | result |
-|---|---|
-| valid action | 235/322 (73%); version 1's rule 200/322; operation alone 243/322 |
-| exact text | 27/41 |
-| candidate retention | 322/322 |
-| ASK under ambiguity | 45/45 (1 ASK where the gold did not ask, of 277) |
-| unauthorized write | 11/281 (mostly typing where the gold focused a window, clicked or was done) |
-| false DONE | 10/243 (6 on done/not-done variants) |
-| write on DONE | 4/79 (and 24/79 missed DONE in all) |
+| | G18b | G17 |
+|---|---|---|
+| valid action | **253/322 (79%)** | 235/322 (73%) |
+| version 1's rule (every labelled head) | 209/322 | 200/322 |
+| operation alone | 223/322 | 243/322 |
+| exact text | 27/41 | 27/41 |
+| candidate retention | 322/322 | 322/322 |
+| ASK under ambiguity | 45/45 (0 ASK where the gold did not ask, of 277) | 45/45 (1 of 277) |
+| unauthorized write | 14/281 | 11/281 |
+| false DONE | 6/243 (none on done/not-done variants) | 10/243 (6 on variants) |
+| write on DONE | 6/79 | 4/79 |
+| missed DONE (not gated) | 12/79 | 24/79 |
 
-- The router's final answers agree with the 4B alone on all 322 operations and used heads. The 20% of steps the
-  0.8B answered itself all agree.
-- **Large lists:** 24/30 under version 2 (26/30 operation). Version 1's 3/30 was the unused `open_target` head on 29
-  of the 30 items, not the list ([deskmind#18](https://github.com/deskmind-ai/deskmind/issues/18)). The padding costs
-  time: p50 6.3 s unpadded vs 15.1 s padded.
-- **Missed DONE is the biggest remaining miss:** 24 of 79 DONE steps, 4 of them writing (16 DONE steps answered with a
-  click). That is the closed-loop failure #18 reports: the right message deleted, then a second one.
-- **Holdout exact text is weak** (1/8 against 26/33 on dev); the holdout split decides.
+- The router's final answers agree with the 4B alone on 317 of 322 operations and used heads (98%; G17: all 322).
+  Agreement is not correctness: the 0.8B now answers 28% of steps itself.
+- **Operation alone is lower, valid action higher:** G18b opens the row where the gym oracle labelled a click (OPEN
+  on the labelled target is valid, a different operation). On large lists that is 27/30 valid, 3/30 the same
+  operation (G17: 24/30 and 26/30). The padding still costs time: 13.7 s p50 padded (the unpadded p50, measured
+  once on G17, was 6.3 s).
+- **Missed DONE halved** (24 to 12 of 79 DONE steps), but more of those that remain write: 6 (4 typing, 2 replacing
+  text), against G17's 4. Unauthorized writes are 14 of 281 (typing where the gold focused a window, opened or was
+  done). Both safety gates stay held at G17's 11 and 4 until the owner decides (brain#14), so G18b fails them
+  against its own baseline.
+- **Holdout exact text is still weak** (2/8 against 25/33 on dev); the holdout split decides.
 
 ## What to try next (one change at a time, against this baseline)
 
@@ -174,5 +213,5 @@ Full numbers, model hashes and every category: [`fixtures/replay/v1/baseline-g18
 4. **Fast-tier head scoring on DONE.** Six branches instead of two on a third of steps; check which of those heads the
    router actually uses.
 
-Routing policy (80% escalation; the 4B's prefill is most of the time) is the biggest lever, but it is deferred until
+Routing policy (72% escalation; the 4B's prefill is most of the time) is the biggest lever, but it is deferred until
 this baseline has been reviewed, as #16 says.

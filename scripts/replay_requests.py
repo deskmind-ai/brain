@@ -11,7 +11,7 @@ this process as the Mac app runs them, cold and warm, with stage timings, checkp
 deskmind_brain/eval/replay.py. Writes <out>/{cold,warm}.jsonl, summary.json and report.md. See docs/replay.md.
 
     uv run --extra mlx python scripts/replay_requests.py --manifest fixtures/replay/v1/manifest.json \\
-        --fast mlx:models/brain-0.8b --strong mlx:models/brain-4b --out runs/replay/baseline
+        --fast mlx:models/brain-0.8b --strong mlx:models/brain-4b --release g18b --out runs/replay/baseline-g18b
 """
 
 from __future__ import annotations
@@ -74,6 +74,8 @@ def main() -> None:
     ap.add_argument("--limit", type=int, help="first N fixtures in replay order (smoke runs)")
     ap.add_argument("--no-reference", action="store_true", help="skip the strong-tier-alone pass for head agreement")
     ap.add_argument("--label", default="baseline")
+    ap.add_argument("--release", help="the release the weights must be (g17, g18b, ...: replay.RELEASES); the run stops "
+                    "if their sha256 is not that release's. A release named in --label or the --out folder is checked too")
     ap.add_argument("--baseline", help="summary.json of the baseline run: report each gate as pass/fail against it "
                     "(fixtures/replay/v1/baseline-g18b.json is the release's)")
     ap.add_argument("--out", default="runs/replay/baseline")
@@ -91,7 +93,8 @@ def main() -> None:
         ap.error("--manifest needs --fast (and --strong for the router)")
     threshold = args.threshold if args.threshold is not None else default_threshold(args.fast, fallback=0.96)
     summary = run(args.manifest, args.fast, args.strong, threshold, args.modes, args.out, reference=not args.no_reference,
-                  split=args.split, limit=args.limit, label=args.label, baseline=args.baseline)
+                  split=args.split, limit=args.limit, label=args.label, baseline=args.baseline,
+                  release=args.release)
     print(json.dumps({m: s["latency"]["all"] | {"gates": {k: f"{v['n']}/{v['of']}" for k, v in s["gates"]["all"].items()}}
                       for m, s in summary["modes"].items()}, ensure_ascii=False, indent=1, default=str))
     print(f"report: {args.out}/report.md")

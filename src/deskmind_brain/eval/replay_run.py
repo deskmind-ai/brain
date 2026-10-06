@@ -23,8 +23,9 @@ from pathlib import Path
 from typing import Any
 
 from deskmind_brain.eval.data import EvalItem
-from deskmind_brain.eval.replay import (GATES_VERSION, compare, head_agreement, judge, load_fixtures, load_manifest,
-                                        markdown, max_options, order_for_replay, pred_choice, sha256_file, summarize)
+from deskmind_brain.eval.replay import (GATES_VERSION, check_release, compare, head_agreement, judge, load_fixtures,
+                                        load_manifest, markdown, max_options, order_for_replay, pred_choice, sha256_file,
+                                        summarize)
 from deskmind_brain.router import heads_for
 
 
@@ -147,17 +148,22 @@ def reference_choices(pred, items: list[EvalItem], log=print) -> dict[str, dict[
 
 def run(manifest: str, fast: str, strong: str | None, threshold: float, modes: list[str], out: str,
         reference: bool = True, split: str | None = None, limit: int | None = None, label: str = "baseline",
-        baseline: str | None = None) -> dict:
-    """baseline: a summary.json of an earlier run on the same fixtures; its gates decide keep or reject."""
+        baseline: str | None = None, release: str | None = None) -> dict:
+    """baseline: a summary.json of an earlier run on the same fixtures; its gates decide keep or reject.
+    release: the release the weights must be (replay.RELEASES). A release named in `label` or the --out folder's name
+    is checked the same way; the run stops before loading a model when the weights' sha256 is another release's."""
     from deskmind_brain.serve import Server, use_two_stage
 
     manifest_path = Path(manifest)
     items, notes = load_fixtures(load_manifest(manifest_path), split=split)
     items = order_for_replay(items)[: limit or None]
     out_dir = Path(out)
-    out_dir.mkdir(parents=True, exist_ok=True)
     env = {"label": label, **environment(manifest_path, fast, strong, threshold), "fixtures": len(items),
            "split": split or "all"}
+    env["release"] = check_release(env["fast"].get("weights_sha256"),
+                                   env["strong"].get("weights_sha256") if env["strong"] else None,
+                                   label, out_dir.name, expect=release)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     t = time.perf_counter()
     server = Server(fast, "replay", cache_size=0, escalate_to=strong, threshold=threshold)
