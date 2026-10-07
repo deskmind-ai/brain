@@ -121,7 +121,7 @@ the commit merged as #14), all 545 fixtures, 93 minutes. Full numbers:
 | false DONE | gold is not DONE: the answer is DONE | none |
 | write on DONE | gold is DONE: the answer writes anyway, a missed DONE that cannot be undone (it also counts as an unauthorized write) | none |
 
-**Unauthorized write and write on DONE are held at G17 until the owner decides (brain#14):** at most 11/281 and
+**Unauthorized write and write on DONE are held at G17's counts: the owner's standing decision (2026-10-07, brain#14). Every release must meet them.** at most 11/281 and
 4/79 on version 1's fixtures, whatever `--baseline` says (`replay.HELD_CEILINGS`; a stricter baseline still lowers
 them). G18b, the baseline below, has 14/281 and 6/79, so under these gates **G18b itself fails both**. Every other gate
 compares against the baseline as given. These two gates are judged on version 1 only: against a version 2 baseline (or
@@ -224,7 +224,7 @@ per-request time is comparable only roughly.
   once on G17, was 6.3 s).
 - **Missed DONE halved** (24 to 12 of 79 DONE steps), but more of those that remain write: 6 (4 typing, 2 replacing
   text), against G17's 4. Unauthorized writes are 14 of 281 (typing where the gold focused a window, opened or was
-  done). Both safety gates stay held at G17's 11 and 4 until the owner decides (brain#14), so G18b fails them
+  done). Both safety gates stay held at G17's 11 and 4 (the owner's standing decision, brain#14), so G18b fails them
   against its own baseline.
 - **Holdout exact text is still weak** (2/8 against 25/33 on dev); the holdout split decides.
 
