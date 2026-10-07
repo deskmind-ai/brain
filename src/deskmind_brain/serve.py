@@ -39,7 +39,8 @@ CRITERIA_FORMS = ("object", "list")
 
 class Server:
     def __init__(self, spec: str, model_name: str, cache_size: int = 64, escalate_to: str | None = None,
-                 threshold: float = 0.94, keep_done_over_undo: bool = True, routing_log: str | None = None):
+                 threshold: float = 0.94, keep_done_over_undo: bool = True, routing_log: str | None = None,
+                 floors: dict | None = None):
         self.predictor = make_predictor(spec)
         self.strong = make_predictor(escalate_to) if escalate_to else None
         self.threshold = threshold
@@ -47,6 +48,9 @@ class Server:
         self.routed = collections.Counter()
         self.routing_log = routing_log
         self.model_name = model_name
+        # Recommended act-or-not floors for clients (deskmind#63 part 2): hands decides whether to act, the values are
+        # calibrated per release and travel with the weights, like the routing threshold. Advertised in /v1/models.
+        self.floors = dict(floors or {})
         self.lock = threading.Lock()
         # An agent loop re-asks about a page it has already seen (a click that changed nothing, a WAIT, a
         # re-observation): same state, same questions, same answer. Caching those cuts a typical browser run by ~20%.
@@ -176,6 +180,8 @@ def make_handler(server: Server, token: str | None = None):
                 entry = {"id": server.model_name, "object": "model", "criteria_forms": list(CRITERIA_FORMS)}
                 if server.strong is not None:
                     entry["routing"] = dict(server.routed)
+                if getattr(server, "floors", None):
+                    entry["floors"] = dict(server.floors)
                 self._send(200, {"data": [entry]})
             else:
                 self._send(404, error_body("not_found", "not found"))
@@ -230,6 +236,27 @@ def default_threshold(spec: str, fallback: float = 0.94) -> float:
         return fallback
 
 
+def default_floors(spec: str) -> dict:
+    """The act-or-not floors a release ships with: `floors` in the fast tier's deskmind.json, e.g.
+    {"consequential": 0.90, "value": 0.5} -- the weakest of p(operation) and its heads a client should require before a
+    consequential action, and the least p of a write's value head. None there: {} (clients use their own defaults)."""
+    path = Path(spec.split(":", 1)[-1]) / "deskmind.json"
+    try:
+        got = json.loads(path.read_text()).get("floors") or {}
+    except (OSError, ValueError):
+        return {}
+    return {k: float(v) for k, v in got.items() if isinstance(v, (int, float))}
+
+
+def parse_floors(text: str) -> dict:
+    """--floors consequential=0.9,value=0.5"""
+    out = {}
+    for part in filter(None, (x.strip() for x in text.split(","))):
+        k, _, v = part.partition("=")
+        out[k.strip()] = float(v)
+    return out
+
+
 def main() -> None:
     p = argparse.ArgumentParser(prog="deskmind-brain-serve")
     p.add_argument("--predictor", required=True, help="any deskmind-brain-eval predictor spec, e.g. mlx:models/brain-4b")
@@ -246,11 +273,14 @@ def main() -> None:
     p.add_argument("--no-keep-done-over-undo", action="store_true",
                    help="with --escalate-to: let the strong tier overrule a fast DONE with an undo click")
     p.add_argument("--routing-log", help="with --escalate-to: append one metadata line per request (who answered, why)")
+    p.add_argument("--floors", help="recommended act-or-not floors advertised in /v1/models, e.g. consequential=0.9,"
+                   "value=0.5 (default: the fast tier's deskmind.json floors, else none)")
     args = p.parse_args()
     if args.threshold is None:
         args.threshold = default_threshold(args.predictor)
+    floors = parse_floors(args.floors) if args.floors else default_floors(args.predictor)
     server = Server(args.predictor, args.model_name, args.cache_size, args.escalate_to, args.threshold,
-                    not args.no_keep_done_over_undo, args.routing_log)
+                    not args.no_keep_done_over_undo, args.routing_log, floors)
     if args.two_stage:
         use_two_stage(server)
     httpd = ThreadingHTTPServer((args.host, args.port), make_handler(server, os.environ.get("DESKMIND_BRAIN_TOKEN") or None))
