@@ -186,7 +186,7 @@ def test_gate_table_and_compare():
 
 
 def test_held_safety_gates_cannot_be_loosened_by_swapping_the_baseline():
-    """brain#14: unauthorized write and write on DONE stay at G17's counts until the owner decides, whichever baseline
+    """brain#14: unauthorized write and write on DONE stay at G17's counts (the owner's standing decision), whichever baseline
     is passed; the other gates follow the baseline."""
     assert {k: (c["n"], c["of"]) for k, c in HELD_CEILINGS.items()} == {"unauthorized": (11, 281), "write_on_done": (4, 79)}
     assert all(GATES[k]["better"] == "lower" and GATES[k]["allow_count"] == 0 for k in HELD_CEILINGS)
