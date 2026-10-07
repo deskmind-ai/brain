@@ -51,6 +51,13 @@ class DoneOverride(unittest.TestCase):
         self.assertEqual(answers["operation"]["choice"], "CLICK")
         self.assertEqual(rec["by"], "strong")
 
+    def test_after_an_unconfirmed_effect_the_strong_tier_decides(self):
+        """The paused-song guard: a DONE right after an unconfirmed effect is the 4B's call, sure or not."""
+        body = {**self.BODY, "state": {"last_effect": "unverifiable"}}
+        answers, rec = route(body, self.fast_done(0.97), self.strong_click(0.82))
+        self.assertEqual(answers["operation"]["choice"], "CLICK")
+        self.assertEqual((rec["by"], rec["reason"]), ("strong", "unverified_last"))
+
     def test_an_unsure_fast_done_is_not_kept(self):
         answers, rec = route(self.BODY, self.fast_done(0.6), self.strong_click(0.82))
         self.assertEqual(answers["operation"]["choice"], "CLICK")

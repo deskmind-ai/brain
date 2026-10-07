@@ -22,6 +22,9 @@ TERMINAL = {"DONE", "BLOCKED", "ASK"}
 # folder, delete, send, paste-move ...) escalates. In the first real-desktop router run 70 of 72 escalated chords were
 # cmd+s, and the 4B chose the same chord every time.
 SAFE_KEYS = {"cmd+s", "cmd+f", "cmd+c", "tab", "escape"}
+# Deliberately asymmetric with COMMIT_WORDS below: cmd+s stays on the fast tier (70 of 72 escalated chords were cmd+s
+# and the 4B always agreed), while a click on a Save button escalates -- the 0.8B's confident consequential mistakes
+# were clicks on save/submit buttons (E1), a chord has no such look-alike targets.
 from deskmind_brain.heads import TEXT_OPS, heads_for  # noqa: E402,F401 -- the scorer's definition, not a copy
 
 #: Controls whose click commits something: hands' risky verbs (deskmind_hands/runtime/risk.py RISKY_WORDS, kept in
@@ -154,7 +157,7 @@ def route(body: dict, fast_answers: dict, strong, threshold: float = 0.94, judge
             confirmed = op == (fast_answers.get("operation") or {}).get("choice")
         if keep_done_over_undo and reason in ("risky_DONE", "unverified_last") and is_undo_click(body, answers):
             answers, reason, escalate = fast_answers, "done_kept_over_undo", False
-        elif (reason in ("risky_DONE", "unverified_last") and op != "DONE"
+        elif (reason == "risky_DONE" and op != "DONE"   # not unverified_last: after an unconfirmed effect the 4B decides
               and top_prob(fast_answers.get("operation") or {}) >= done_keep
               and answer_conf(answers, body.get("questions") or {}) < done_override):
             # The strong tier overrules a fairly sure fast DONE, but not surely enough: the DONE stands.
