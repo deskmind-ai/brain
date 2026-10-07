@@ -8,3 +8,4 @@ these its data must cover. A change to the protocol's schema bumps the protocol 
 | PR | What changes | Model sees it? | Replay |
 |---|---|---|---|
 | brain#17 | The router sends a CLICK on a commit control (save, submit, send, delete, pay, publish, share) to the strong tier at any confidence (`risky_commit`); a fast DONE (p ≥ 0.8) stands when the strong tier's alternative scores below 0.96 (`done_kept_low_override`, risky_DONE only) | No: which tier's answer is returned | pending (v1 ~1 h) |
+| brain#19 | `/v1/models` may carry `floors` (e.g. `{"consequential": 0.9, "value": 0.5}`): recommended act-or-not floors for clients, from the release's `deskmind.json` or `--floors`. G18b's values from E1 (deskmind#63): 0.90 / 0.5 | No: transport metadata, a protocol addition (deskmind protocol SPEC) | not affected |
